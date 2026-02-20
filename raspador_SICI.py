@@ -27,90 +27,57 @@ def obter_nivel_por_id(element_id):
     return len(divs)
 
 def capturar_dados_painel():
-    try:
-        area = driver.find_element(
-            By.ID,
-            "ContentPlaceHolder1_lblNomeUnidadeGestaoSelecionada"
-        ).text.strip()
-    except:
-        area = ""
+    area = driver.execute_script(
+        "return document.getElementById('ContentPlaceHolder1_lblNomeUnidadeGestaoSelecionada')?.innerText;"
+    ) or ""
 
-    try:
-        cargo = driver.find_element(
-            By.ID,
-            "ContentPlaceHolder1_lblCargo"
-        ).text.strip()
-    except:
-        cargo = ""
+    cargo = driver.execute_script(
+        "return document.getElementById('ContentPlaceHolder1_lblCargo')?.innerText;"
+    ) or ""
 
-    return area, cargo
+    return area.strip(), cargo.strip()
 
-def expandir_apenas_ramos_validos():
-    print("Expandindo apenas ramos A/D...")
+def expandir_tudo():
+    print("Expandindo toda a árvore...")
 
-    # Primeiro pegar todos os órgãos nível 1
-    links = driver.find_elements(
-        By.XPATH,
-        "//a[starts-with(@id,'ContentPlaceHolder1_ua_treeviewt')]"
-    )
+    while True:
+        botoes = driver.find_elements(
+            By.XPATH,
+            "//img[starts-with(@alt,'Expand')]"
+        )
 
-    orgaos_validos_ids = []
+        if not botoes:
+            break
 
-    for elemento in links:
-        texto = elemento.text.strip()
-        if not texto:
-            continue
+        botao = botoes[-1]
 
-        element_id = elemento.get_attribute("id")
-        nivel = obter_nivel_por_id(element_id)
-
-        if nivel == 1:
-            tr = elemento.find_element(By.XPATH, "./ancestor::tr")
-            imagens = tr.find_elements(
-                By.XPATH,
-                ".//img[contains(@src,'img-folder-closed-')]"
+        try:
+            driver.execute_script(
+                "arguments[0].scrollIntoView({block: 'center'});",
+                botao
             )
 
-            for img in imagens:
-                src = img.get_attribute("src")
-                if src.endswith("-A.gif") or src.endswith("-D.gif"):
-                    orgaos_validos_ids.append(element_id)
-                    break
+            quantidade_antes = len(botoes)
+            botao.click()
 
-    # Agora expandir apenas esses ramos
-    for orgao_id in orgaos_validos_ids:
-        while True:
-            try:
-                elemento = driver.find_element(By.ID, orgao_id)
-                tr = elemento.find_element(By.XPATH, "./ancestor::tr")
-
-                botao_expandir = tr.find_elements(
+            wait.until(
+                lambda d: len(d.find_elements(
                     By.XPATH,
-                    ".//img[starts-with(@alt,'Expand')]"
-                )
+                    "//img[starts-with(@alt,'Expand')]"
+                )) != quantidade_antes
+            )
 
-                if not botao_expandir:
-                    break
+            time.sleep(0.2)
 
-                driver.execute_script(
-                    "arguments[0].scrollIntoView({block: 'center'});",
-                    botao_expandir[0]
-                )
+        except:
+            continue
 
-                botao_expandir[0].click()
-                time.sleep(0.4)
-
-            except:
-                break
-
-    print("Expansão seletiva concluída.")
+    print("Expansão completa finalizada.\n")
 
 
 # ---------------- EXECUÇÃO ----------------
 
-print("Expandindo toda a árvore...")
-expandir_apenas_ramos_validos()
-print("Expansão concluída.\n")
+expandir_tudo()
 
 index = 0
 orgao_atual = None
@@ -135,17 +102,15 @@ while True:
     element_id = elemento.get_attribute("id")
     nivel = obter_nivel_por_id(element_id)
 
-    # Ignorar PCRJ (nível 0)
     if nivel == 0:
         index += 1
         continue
 
-    # Quando for nível 1 (órgão raiz)
+    # Se for órgão raiz
     if nivel == 1:
         orgao_atual = texto
 
-        # verificar letra somente no nível 1
-        tr = driver.find_element(By.ID, element_id).find_element(By.XPATH, "./ancestor::tr")
+        tr = elemento.find_element(By.XPATH, "./ancestor::tr")
         imagens = tr.find_elements(By.XPATH, ".//img[contains(@src,'img-folder-closed-')]")
 
         capturar_ramo = False
@@ -155,15 +120,11 @@ while True:
                 capturar_ramo = True
                 break
 
-    # Captura somente se ramo válido
     if capturar_ramo and nivel <= 3:
 
-        try:
-            area_antes = driver.execute_script(
-                "return document.getElementById('ContentPlaceHolder1_lblNomeUnidadeGestaoSelecionada')?.innerText;"
-            )
-        except:
-            area_antes = ""
+        area_antes = driver.execute_script(
+            "return document.getElementById('ContentPlaceHolder1_lblNomeUnidadeGestaoSelecionada')?.innerText;"
+        )
 
         driver.find_element(By.ID, element_id).click()
 
@@ -187,11 +148,9 @@ while True:
     index += 1
 
 
-# ---------------- EXPORTAÇÃO ----------------
-
 df = pd.DataFrame(resultados)
 df.to_excel("sici_completo.xlsx", index=False)
 
 driver.quit()
 
-print("\nProcesso finalizado. Arquivo 'sici_completo.xlsx' gerado com sucesso.")
+print("Processo finalizado.")
