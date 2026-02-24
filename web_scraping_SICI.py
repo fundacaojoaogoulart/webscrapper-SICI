@@ -5,7 +5,7 @@ import re
 import unicodedata
 import openpyxl
 
-ARQUIVO_EXCEL = 'MFE.xlsx'
+ARQUIVO_EXCEL = 'MFE - Planilha de Inserção e Classificação das Funções.xlsx'
 NOME_ABA = "Todas as Funções (Editável)"
 ORGAO_ALVO = "GBP"
 
