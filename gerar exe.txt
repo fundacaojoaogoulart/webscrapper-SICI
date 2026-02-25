@@ -1,1 +1,1 @@
-pyinstaller --clean --onefile --windowed --collect-all selenium painel_principal.py
+pyinstaller --clean --onefile --windowed --collect-all selenium --icon=icon.ico painel_principal.py
