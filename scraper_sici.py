@@ -338,6 +338,14 @@ def iniciar_raspagem():
         exibir_alerta("Erro na Extração SICI", erro_msg, "error")
 
     finally:
+        tempo_fim = time.time()
+        duracao_segundos = tempo_fim - tempo_inicio
+        tempo_formatado = str(datetime.timedelta(seconds=int(duracao_segundos)))
+        
+        print("-" * 40)
+        print(f"⏱️ Tempo total de execução: {tempo_formatado}")
+        print("-" * 40)
+    
         if len(resultados) > 0:
             agora = datetime.datetime.now()
             data_extracao_str = agora.strftime("%d/%m/%Y %H:%M:%S") 
@@ -349,7 +357,7 @@ def iniciar_raspagem():
             nome_arquivo = f"sici_extracao_{nome_arquivo_data}.xlsx"
             df.to_excel(nome_arquivo, index=False)
             
-            msg_sucesso = f"✅ Raspagem do SICI concluída com sucesso!\n\nArquivo gerado: {nome_arquivo}\nTotal de registros extraídos: {len(resultados)}\n\nClique em OK para iniciar a conferência e atualização da planilha MFE."
+            msg_sucesso = f"✅ Raspagem do SICI concluída com sucesso!\n\nArquivo gerado: {nome_arquivo}\nTotal de registros extraídos: {len(resultados)}\nTempo de execução: {tempo_formatado}\nClique em OK para iniciar a conferência e atualização da planilha MFE."
             print(f"\n✅ SUCESSO! Arquivo '{nome_arquivo}' salvo com {len(resultados)} registros.")
             exibir_alerta("Raspagem Concluída", msg_sucesso, "info")
             
@@ -363,13 +371,7 @@ def iniciar_raspagem():
         driver.quit()
         print("Navegador encerrado.")
 
-        tempo_fim = time.time()
-        duracao_segundos = tempo_fim - tempo_inicio
-        tempo_formatado = str(datetime.timedelta(seconds=int(duracao_segundos)))
-        
-        print("-" * 40)
-        print(f"⏱️ Tempo total de execução: {tempo_formatado}")
-        print("-" * 40)
+
 
 # Este bloco no final garante que se você rodar SÓ esse arquivo direto, 
 # ele chama a raspagem. Se rodar pelo painel, não roda sozinho.
