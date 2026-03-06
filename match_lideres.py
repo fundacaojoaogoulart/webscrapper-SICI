@@ -121,13 +121,13 @@ def cruzar_planilhas(dados_sici,tarefa = ""):
     if tarefa == "PLC":
         df_c['status'] = np.where(
             df_c['chave_nome_b'].notna(), 
-            "líder em cargo comissionado", 
+            "Líder em cargo comissionado", 
             "Não está em cargo comissionado"
         )
     elif tarefa == "PRLF":
             df_c['status'] = np.where(
             df_c['chave_nome_b'].notna(), 
-            "liderança feminina em cargo comissionado", 
+            "Liderança feminina em cargo comissionado", 
             "Não está em cargo comissionado"
         )
     df_c = df_c.drop(columns=['chave_nome_a', 'chave_nome_b'])
