@@ -76,6 +76,11 @@ def cruzar_planilhas(dados_sici,tarefa = ""):
     except Exception as e:
         messagebox.showerror("Erro de Leitura", f"Falha ao ler os arquivos:\n{e}")
         return False
+    
+    if tarefa == "PLC":
+        ARQUIVO_C = "planilha_cruzamento_PLC.xlsx"
+    elif tarefa == "PRLF":
+        ARQUIVO_C = "planilha_cruzamento_PRLF.xlsx"
 
     # 🔥 PORTA DE VALIDAÇÃO: Verifica se as colunas obrigatórias existem antes de prosseguir
     if 'NOME' not in df_a.columns:
