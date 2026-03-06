@@ -36,15 +36,15 @@ def selecionar_arquivo_sici():
     return caminho_arquivo
 
 def selecionar_planilha_minibios():
-    messagebox.showinfo("Selecione um arquivo", "Selecione a planilha de LÍDERES (Minibios) para fazer o cruzamento.")
+    messagebox.showinfo("Selecione um arquivo", "Selecione a planilha de Lideranças para fazer o cruzamento.")
     caminho_arquivo = filedialog.askopenfilename(
-        title="2. Selecione a planilha de LÍDERES",
+        title="2. Selecione a planilha de Lideranças",
         filetypes=[("Arquivos Excel", "*.xlsx"), ("Todos os Arquivos", "*.*")]
     )
     return caminho_arquivo
 
 # ---------------- LÓGICA PRINCIPAL ----------------
-def cruzar_planilhas(dados_sici):
+def cruzar_planilhas(dados_sici,tarefa = ""):
     print("[*] Carregando as planilhas...")
     
     try:
@@ -52,8 +52,8 @@ def cruzar_planilhas(dados_sici):
         
         planilha_a = selecionar_planilha_minibios()
         if not planilha_a:
-            print("[ALERTA] Nenhuma planilha Minibios foi selecionada.")
-            messagebox.showwarning("Aviso", "Nenhuma planilha de Líderes foi selecionada. Operação cancelada.")
+            print("[ALERTA] Nenhuma planilha de lideranças foi selecionada.")
+            messagebox.showwarning("Aviso", "Nenhuma planilha de lideranças foi selecionada. Operação cancelada.")
             return False
         
         if isinstance(dados_sici, str):
@@ -79,7 +79,7 @@ def cruzar_planilhas(dados_sici):
 
     # 🔥 PORTA DE VALIDAÇÃO: Verifica se as colunas obrigatórias existem antes de prosseguir
     if 'NOME' not in df_a.columns:
-        erro_msg = "A planilha de Líderes (Minibios) selecionada não possui a coluna 'NOME'.\n\nVerifique o cabeçalho do arquivo e tente novamente."
+        erro_msg = "A planilha de Líderanças selecionada não possui a coluna 'NOME'.\n\nVerifique o cabeçalho do arquivo e tente novamente."
         print(f"[ERRO] {erro_msg}")
         messagebox.showerror("Erro de Formato", erro_msg)
         return False
@@ -113,13 +113,18 @@ def cruzar_planilhas(dados_sici):
     )
 
     print("[*] Gerando a coluna de status...")
-    
-    df_c['status'] = np.where(
-        df_c['chave_nome_b'].notna(), 
-        "líder em cargo comissionado", 
-        "Não está em cargo comissionado"
-    )
-
+    if tarefa == "PLC":
+        df_c['status'] = np.where(
+            df_c['chave_nome_b'].notna(), 
+            "líder em cargo comissionado", 
+            "Não está em cargo comissionado"
+        )
+    elif tarefa == "PRLF":
+            df_c['status'] = np.where(
+            df_c['chave_nome_b'].notna(), 
+            "liderança feminina em cargo comissionado", 
+            "Não está em cargo comissionado"
+        )
     df_c = df_c.drop(columns=['chave_nome_a', 'chave_nome_b'])
 
     colunas_originais_a = [col for col in df_a.columns if col != 'chave_nome_a']
@@ -138,7 +143,10 @@ def cruzar_planilhas(dados_sici):
         return False
     
     total_lideres = len(df_c)
-    total_comissionados = len(df_c[df_c['status'] == "líder em cargo comissionado"]) 
+    if tarefa == "PLC":
+        total_comissionados = len(df_c[df_c['status'] == "líder em cargo comissionado"]) 
+    elif tarefa == "PRLF":
+        total_comissionados = len(df_c[df_c['status'] == "liderança feminina em cargo comissionado"])
     
     resumo_msg = f"✅ Cruzamento Concluído!\n\nTotal de líderes validados: {total_lideres}\nEncontrados em cargos comissionados: {total_comissionados}\n\nArquivo '{ARQUIVO_C}' salvo com sucesso!"
     

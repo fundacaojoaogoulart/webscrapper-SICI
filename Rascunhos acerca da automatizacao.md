@@ -4,7 +4,7 @@ O dado sobre se cada função gerencia equipes é obtido com a Coordenadoria Ger
     *Podemos cruzar a coluna de função vinda da extração do SICI para fazer esse match
 
 O dado sobre os nomes de ordenadores de despesa vem do Sistama Único e Integrado de Execução Orçamentária, Admnistração Financeira e Controle (SIAFIC).
-    *Tamém podemos cruzar com a planilha extraida do SICI
+    *Também podemos cruzar com a planilha extraida do SICI
 
 ## Critério de Relevância Oraçamentária
  .Magnitude do orçamento

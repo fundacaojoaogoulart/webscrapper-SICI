@@ -38,11 +38,30 @@ def executar_somente_lideres():
     """Roda apenas o match de líderes a partir de um Excel SICI já existente"""
     match_lideres.inicializar_tkinter()
     arquivo_selecionado = match_lideres.selecionar_arquivo_sici()
+    tarefa = "PLC"
     
     if arquivo_selecionado:
         lbl_status.config(text="Status: Cruzando dados de Líderes...", fg="blue")
         # 🔥 Verifica a resposta do script
-        sucesso = match_lideres.cruzar_planilhas(arquivo_selecionado)
+        sucesso = match_lideres.cruzar_planilhas(arquivo_selecionado,tarefa)
+        
+        if sucesso:
+            lbl_status.config(text="Status: Cruzamento Concluído!", fg="green")
+        else:
+            lbl_status.config(text="Status: Operação com Erro ou Cancelada.", fg="red")
+    else:
+        lbl_status.config(text="Status: Operação Cancelada.", fg="orange")
+
+def executar_somente_lideranca_feminina():
+    """Roda apenas o match de líderes a partir de um Excel SICI já existente"""
+    match_lideres.inicializar_tkinter()
+    arquivo_selecionado = match_lideres.selecionar_arquivo_sici()
+    tarefa = "PRLF"
+    
+    if arquivo_selecionado:
+        lbl_status.config(text="Status: Cruzando dados de Líderes...", fg="blue")
+        # 🔥 Verifica a resposta do script
+        sucesso = match_lideres.cruzar_planilhas(arquivo_selecionado,tarefa)
         
         if sucesso:
             lbl_status.config(text="Status: Cruzamento Concluído!", fg="green")
@@ -88,12 +107,14 @@ btn2 = tk.Button(root, text="2. Somente Atualizar MFE", font=("Arial", 10), bg="
 btn2.pack(pady=3)
 btn3 = tk.Button(root, text="3. Somente Contabilizar Líderes Cariocas (Minibios)", font=("Arial", 10), bg="#fff3e0", command=executar_somente_lideres, width=45)
 btn3.pack(pady=3)
+btn4 = tk.Button(root, text="4. Somente Contabilizar Liderança Feminina", font=("Arial", 10), bg="#ffc4dd", command=executar_somente_lideranca_feminina, width=45)
+btn4.pack(pady=3)
 
 # --- CONFIGURAÇÕES ---
-btn4 = tk.Button(root, text="⚙️ Editar Filtro de Palavras Ignoradas", font=("Arial", 9), fg="#333", bg="#f5f5f5", command=abrir_config_palavras, width=45)
-btn4.pack(pady=(15, 0))
+btn5 = tk.Button(root, text="⚙️ Editar Filtro de Palavras Ignoradas", font=("Arial", 9), fg="#333", bg="#f5f5f5", command=abrir_config_palavras, width=45)
+btn5.pack(pady=(15, 0))
 
-botoes.extend([btn1, btn2, btn3, btn4])
+botoes.extend([btn1, btn2, btn3, btn4,btn5])
 
 lbl_status = tk.Label(root, text="Status: Aguardando comando...", font=("Arial", 9, "italic"), fg="gray")
 lbl_status.pack(pady=(10, 0))

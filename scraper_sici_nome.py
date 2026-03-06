@@ -38,7 +38,7 @@ DEFAULT_WORDS = [
     "fundo municipal", "unidade municipal de reinserção", "central de recepção",
     "centro de cidadania", "conselho", "comitê", "fundo", "comissão",
     "vila olímpica", "casa viva", "centro esportivo", "junta especial",
-    "juntas", "museu histórico"
+    "juntas", "museu histórico", "Secretaria Executiva da Câmara"
 ]
 
 def carregar_palavras_ignoradas():
