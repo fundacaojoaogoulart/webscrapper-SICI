@@ -1,0 +1,5 @@
+Na planilha do MFE não tem nomes, apenas cargos
+A extração do sici traz cargos e nomes
+Precisamos ver se a pessoa no cargo é ordenadora de despesas ou o cargo é um cargo de ordenação de despesas?
+Para adicionar o cargo como ordenador de despesas, nós vamos verificar se o nome da pessoa está na lista de ordenadores e se estiver, buscar o nome do cargo em que ela está
+na planilha do MFE e adiciona-lo como um ordenador de despesas.
