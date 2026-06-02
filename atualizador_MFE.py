@@ -164,9 +164,9 @@ def atualizar_planilha_mfe(dados_sici):
         # Regras de preenchimento e cor
         cor_fundo = None
         if not verificar_ordenadores or total_pessoas == 0 or total_ordenadores == 0:
-            texto = "1 - Não possui poder de decisão sobre alocação de recursos orçamentários no órgão"
+            texto = "1 - Não"
         elif total_ordenadores == total_pessoas:
-            texto = "2 - Possui poder de decisão sobre alocação de recursos orçamentários no órgão"
+            texto = "2 - Sim"
         else:
             # Estado Misto!
             texto = "⚠️ REVISÃO MANUAL: Cargo possui titulares com e sem poder de ordenação"
@@ -228,7 +228,7 @@ def atualizar_planilha_mfe(dados_sici):
             nova_linha[2] = dados_si['escalao'] 
             nova_linha[3] = dados_si['area']    
             nova_linha[4] = dados_si['cargo']   
-            nova_linha[11] = dados_si['texto_ordenador'] 
+            nova_linha[9] = dados_si['texto_ordenador'] 
             
             # Guardamos a linha junto com a cor que ela deve receber
             novos_registros.append({"dados": nova_linha, "cor": dados_si['cor_fundo']})
@@ -249,7 +249,7 @@ def atualizar_planilha_mfe(dados_sici):
         # 1. ATUALIZAÇÕES e PINTURA
         if linhas_para_atualizar and verificar_ordenadores:
             for item in linhas_para_atualizar:
-                celula = ws.cell(row=item['linha'], column=12, value=item['texto_ordenador'])
+                celula = ws.cell(row=item['linha'], column=10, value=item['texto_ordenador'])
                 if item['cor']:
                     celula.fill = PatternFill(start_color=item['cor'], end_color=item['cor'], fill_type="solid")
                 else:
@@ -272,7 +272,7 @@ def atualizar_planilha_mfe(dados_sici):
                 for col_idx, valor in enumerate(registro["dados"], start=1):
                     if valor: 
                         cel_add = ws.cell(row=linha_alvo, column=col_idx, value=valor)
-                        if col_idx == 12 and registro["cor"]:
+                        if col_idx == 10 and registro["cor"]:
                             cel_add.fill = PatternFill(start_color=registro["cor"], end_color=registro["cor"], fill_type="solid")
                 linha_alvo += 1
 

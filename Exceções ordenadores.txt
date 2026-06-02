@@ -1,0 +1,11 @@
+Somente os chefes de gabinete do prefeito
+
+Chefe de Gabinete <- Nome do cargo (da Área Gabinete do Vice-Prefeito)
+
+Procurador Geral do Município <- Nome do Cargo
+Controlador Geral <- Nome do Cargo
+Secretário <- Tipo do cargo (Vai incluir o Inspetor geral)
+Presidente de Autarquia <- Nome do Cargo
+Subprocurador Geral do Município <- Nome do Cargo
+Subcontrolador <- Nome do Cargo
+Coordenadoria Regional de Educação <- Área
