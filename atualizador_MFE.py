@@ -38,6 +38,50 @@ def inicializar_tkinter():
         root.attributes("-topmost", True)
     return root
 
+def carregar_excecoes_poder_decisorio():
+    """Lê as exceções de Coluna L a partir de um txt. Se não existir, cria com o padrão."""
+    arquivo_config = "excecoes_poder_decisorio.txt"
+    cargos = []
+    areas = []
+    
+    if not os.path.exists(arquivo_config):
+        with open(arquivo_config, "w", encoding="utf-8") as f:
+            f.write("# Este arquivo define regras extras para a coluna de Poder de Decisão (Coluna L).\n")
+            f.write("# O sistema ignora maiúsculas, minúsculas e acentos na hora da leitura.\n\n")
+            f.write("[CARGO_EXATO]\n")
+            f.write("Chefe de Gabinete\n")
+            f.write("Procurador Geral do Município\n")
+            f.write("Subprocurador Geral do Município\n")
+            f.write("Controlador Geral\n")
+            f.write("Secretário Especial\n")
+            f.write("Secretário Municipal\n")
+            f.write("Subsecretário\n")
+            f.write("Inspetor Geral\n")
+            f.write("Presidente de Autarquia\n")
+            f.write("Subcontrolador\n\n")
+            f.write("[AREA_CONTEM]\n")
+            f.write("Coordenadoria Regional de Educação\n")
+    
+    modo = None
+    with open(arquivo_config, "r", encoding="utf-8") as f:
+        for linha in f:
+            linha = linha.strip()
+            if not linha or linha.startswith("#"):
+                continue
+            if linha == "[CARGO_EXATO]":
+                modo = "cargo"
+                continue
+            if linha == "[AREA_CONTEM]":
+                modo = "area"
+                continue
+                
+            if modo == "cargo":
+                cargos.append(normalizar(linha))
+            elif modo == "area":
+                areas.append(normalizar(linha))
+    
+    return set(cargos), areas
+
 def selecionar_arquivo_sici_interface():
     messagebox.showinfo("Selecione um arquivo", "Selecione a planilha extraída do SICI que contém os dados novos.")
     return filedialog.askopenfilename(
@@ -75,7 +119,9 @@ def atualizar_planilha_mfe(dados_sici):
         print("[ALERTA] Os dados do SICI estão vazios.")
         return
 
-    # --- 2. CARREGAR OS DADOS DE ORDENADORES ---
+    # --- 2. CARREGAR OS DADOS DE ORDENADORES E EXCEÇÕES ---
+    cargos_excecao, areas_excecao_contem = carregar_excecoes_poder_decisorio()
+    
     verificar_ordenadores = messagebox.askyesno(
         "Ordenadores de Despesa", 
         "Deseja verificar por ordenadores de despesa? (Será necessário fornecer a base de dados)"
@@ -145,14 +191,17 @@ def atualizar_planilha_mfe(dados_sici):
                 "escalao": str(rs.get('escalão', '')),
                 "area": str(rs.get('área', '')),
                 "cargo": str(rs.get('cargo', '')),
-                "titulares": set() # 🔥 Agrupa todos os titulares deste cargo
+                "titulares": set() 
             }
             
         if titular and len(titular) > 2 and titular not in lixos:
             sici_keys[chave_si]["titulares"].add(titular)
 
-    # --- 4. AVALIAÇÃO DE ORDENADORES E CORES ---
+    # --- 4. AVALIAÇÃO DE ORDENADORES, PODER DE DECISÃO E CORES ---
     qtd_alertas = 0
+    texto_poder_sim = "2 - Possui poder de decisão sobre alocação de recursos orçamentários no órgão"
+    texto_poder_nao = "1 - Não possui poder de decisão sobre alocação de recursos orçamentários no órgão"
+
     for chave_si, dados_si in sici_keys.items():
         titulares_do_cargo = dados_si["titulares"]
         total_pessoas = len(titulares_do_cargo)
@@ -161,19 +210,40 @@ def atualizar_planilha_mfe(dados_sici):
         if verificar_ordenadores:
             total_ordenadores = sum(1 for t in titulares_do_cargo if t in set_ordenadores)
             
-        # Regras de preenchimento e cor
+        # Regras de preenchimento e cor (Coluna 10 / J)
         cor_fundo = None
         if not verificar_ordenadores or total_pessoas == 0 or total_ordenadores == 0:
-            texto = "1 - Não"
+            texto_ordenador = "1 - Não"
         elif total_ordenadores == total_pessoas:
-            texto = "2 - Sim"
+            texto_ordenador = "2 - Sim"
         else:
-            # Estado Misto!
-            texto = "⚠️ REVISÃO MANUAL: Cargo possui titulares com e sem poder de ordenação"
+            texto_ordenador = "⚠️ REVISÃO MANUAL: Cargo possui titulares com e sem poder de ordenação"
             cor_fundo = COR_ALERTA
             qtd_alertas += 1
             
-        dados_si['texto_ordenador'] = texto
+        # Regras de preenchimento do Poder de Decisão (Coluna 12 / L)
+        cargo_norm = normalizar(dados_si['cargo'])
+        area_norm = normalizar(dados_si['area'])
+        
+        is_excecao_poder = False
+        if cargo_norm in cargos_excecao:
+            is_excecao_poder = True
+        else:
+            for area_excecao in areas_excecao_contem:
+                if area_excecao in area_norm: # Verifica se a string exigida está contida na Área
+                    is_excecao_poder = True
+                    break
+
+        if texto_ordenador == "2 - Sim" or is_excecao_poder:
+            texto_poder_decisao = texto_poder_sim
+        elif texto_ordenador.startswith("⚠️"):
+            # Se for misto, repassa o alerta também para a L, mas se for exceção, a exceção salva e recebe 2!
+            texto_poder_decisao = "⚠️ REVISÃO MANUAL: Avalie o poder de decisão deste cargo (titulares mistos)"
+        else:
+            texto_poder_decisao = texto_poder_nao
+
+        dados_si['texto_ordenador'] = texto_ordenador
+        dados_si['texto_poder_decisao'] = texto_poder_decisao
         dados_si['cor_fundo'] = cor_fundo
 
     # --- 5. VISITAR MFE E MAPEAMENTO ---
@@ -228,15 +298,16 @@ def atualizar_planilha_mfe(dados_sici):
             nova_linha[2] = dados_si['escalao'] 
             nova_linha[3] = dados_si['area']    
             nova_linha[4] = dados_si['cargo']   
-            nova_linha[9] = dados_si['texto_ordenador'] 
+            nova_linha[9] = dados_si['texto_ordenador']   # Coluna J
+            nova_linha[11] = dados_si['texto_poder_decisao'] # Coluna L
             
-            # Guardamos a linha junto com a cor que ela deve receber
             novos_registros.append({"dados": nova_linha, "cor": dados_si['cor_fundo']})
             dados_adicionados.append(dados_si)
         else:
             linhas_para_atualizar.append({
                 'linha': mfe_keys[chave_si]['linha'],
                 'texto_ordenador': dados_si['texto_ordenador'],
+                'texto_poder_decisao': dados_si['texto_poder_decisao'],
                 'cor': dados_si['cor_fundo']
             })
 
@@ -249,11 +320,15 @@ def atualizar_planilha_mfe(dados_sici):
         # 1. ATUALIZAÇÕES e PINTURA
         if linhas_para_atualizar and verificar_ordenadores:
             for item in linhas_para_atualizar:
-                celula = ws.cell(row=item['linha'], column=10, value=item['texto_ordenador'])
+                cel_j = ws.cell(row=item['linha'], column=10, value=item['texto_ordenador'])
+                cel_l = ws.cell(row=item['linha'], column=12, value=item['texto_poder_decisao'])
+                
                 if item['cor']:
-                    celula.fill = PatternFill(start_color=item['cor'], end_color=item['cor'], fill_type="solid")
+                    cel_j.fill = PatternFill(start_color=item['cor'], end_color=item['cor'], fill_type="solid")
+                    cel_l.fill = PatternFill(start_color=item['cor'], end_color=item['cor'], fill_type="solid")
                 else:
-                    celula.fill = PatternFill(fill_type=None) # Limpa a cor se o status não for mais de alerta
+                    cel_j.fill = PatternFill(fill_type=None) 
+                    cel_l.fill = PatternFill(fill_type=None)
 
         # 2. EXCLUSÕES
         if linhas_para_excluir:
@@ -272,7 +347,7 @@ def atualizar_planilha_mfe(dados_sici):
                 for col_idx, valor in enumerate(registro["dados"], start=1):
                     if valor: 
                         cel_add = ws.cell(row=linha_alvo, column=col_idx, value=valor)
-                        if col_idx == 10 and registro["cor"]:
+                        if (col_idx == 10 or col_idx == 12) and registro["cor"]:
                             cel_add.fill = PatternFill(start_color=registro["cor"], end_color=registro["cor"], fill_type="solid")
                 linha_alvo += 1
 
@@ -310,7 +385,7 @@ def atualizar_planilha_mfe(dados_sici):
         if qtd_alertas > 0:
             mensagem_resumo += f"\n\n⚠️ {qtd_alertas} cargos apresentaram ordenação mista e foram marcados em AMARELO na planilha para sua revisão manual."
         else:
-            mensagem_resumo += f"\n\n⚙️ A coluna L foi calibrada perfeitamente. Nenhum conflito de ordenação misto foi encontrado!"
+            mensagem_resumo += f"\n\n⚙️ As colunas J e L foram calibradas com base nas regras e no arquivo de exceções."
 
     messagebox.showinfo("Atualização Concluída", mensagem_resumo)
 

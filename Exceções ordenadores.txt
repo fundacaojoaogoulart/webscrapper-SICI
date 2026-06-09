@@ -1,11 +1,14 @@
-Somente os chefes de gabinete do prefeito
+Somente os chefes de gabinete do prefeito (?)
 
-Chefe de Gabinete <- Nome do cargo (da Área Gabinete do Vice-Prefeito)
-
+Chefe de Gabinete <- Nome do cargo 
 Procurador Geral do Município <- Nome do Cargo
-Controlador Geral <- Nome do Cargo
-Secretário <- Tipo do cargo (Vai incluir o Inspetor geral)
-Presidente de Autarquia <- Nome do Cargo
 Subprocurador Geral do Município <- Nome do Cargo
+Controlador Geral <- Nome do Cargo
+Secretário Especial, Secretário Municipal e Subsecretario <- Nome do cargo
+Inspetor Geral <- Nome do Cargo
+
+Presidente de Autarquia <- Nome do Cargo
 Subcontrolador <- Nome do Cargo
-Coordenadoria Regional de Educação <- Área
+Coordenadoria Regional de Educação <- Área (Contém esse nome)
+
+[REGRA] Se Ordenador, então poder Poder decisório

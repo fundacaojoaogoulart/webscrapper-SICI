@@ -1,0 +1,17 @@
+# Este arquivo define regras extras para a coluna de Poder de Decisão (Coluna L).
+# O sistema ignora maiúsculas, minúsculas e acentos na hora da leitura.
+
+[CARGO_EXATO]
+Chefe de Gabinete
+Procurador Geral do Município
+Subprocurador Geral do Município
+Controlador Geral
+Secretário Especial
+Secretário Municipal
+Subsecretário
+Inspetor Geral
+Presidente de Autarquia
+Subcontrolador
+
+[AREA_CONTEM]
+Coordenadoria Regional de Educação
