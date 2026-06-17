@@ -1,6 +1,5 @@
 import pandas as pd
 import openpyxl
-from openpyxl.styles import PatternFill 
 import unicodedata
 import re
 import datetime
@@ -11,7 +10,6 @@ from tkinter import messagebox
 
 # ---------------- CONFIGURAÇÕES ----------------
 NOME_ABA = "Todas as Funções (Editável)"
-COR_ALERTA = "FFFF00" # Amarelo para revisão manual
 
 # ---------------- UTILITÁRIOS ----------------
 def normalizar(texto):
@@ -172,7 +170,7 @@ def atualizar_planilha_mfe(dados_sici):
                 messagebox.showerror("Erro", f"Falha ao processar arquivo de ordenadores:\n{e}")
                 verificar_ordenadores = False
 
-    # --- 3. AGRUPAMENTO SICI (Identificar Cargos Mistos) ---
+    # --- 3. AVALIAÇÃO E INDEXAÇÃO SICI (1 Pessoa = 1 Linha) ---
     sici_keys = {}
     lixos = {'vago', 'vaga', 'nao informado', 'sem titular', '-'}
     
@@ -181,72 +179,47 @@ def atualizar_planilha_mfe(dados_sici):
         esc = normalizar(str(rs.get('escalão', '')))
         area = normalizar(str(rs.get('área', '')))
         cargo = normalizar(str(rs.get('cargo', '')))
-        titular = normalizar_nome(str(rs.get('titular', '')))
         
-        chave_si = f"{org}|{esc}|{area}|{cargo}"
+        titular_original = str(rs.get('titular', '')).strip()
+        titular_norm = normalizar_nome(titular_original)
         
-        if chave_si not in sici_keys:
-            sici_keys[chave_si] = {
-                "orgao": str(rs.get('órgão', '')),
-                "escalao": str(rs.get('escalão', '')),
-                "area": str(rs.get('área', '')),
-                "cargo": str(rs.get('cargo', '')),
-                "titulares": set() 
-            }
+        # A nova Chave Primária inclui o Titular! 
+        # Isso quebra os cargos em múltiplas linhas automaticamente.
+        chave_si = f"{org}|{esc}|{area}|{cargo}|{titular_norm}"
+        
+        # Avaliação de Ordenador Individual
+        is_ordenador = False
+        if verificar_ordenadores and titular_norm and titular_norm not in lixos and len(titular_norm) > 2:
+            is_ordenador = titular_norm in set_ordenadores
             
-        if titular and len(titular) > 2 and titular not in lixos:
-            sici_keys[chave_si]["titulares"].add(titular)
-
-    # --- 4. AVALIAÇÃO DE ORDENADORES, PODER DE DECISÃO E CORES ---
-    qtd_alertas = 0
-    texto_poder_sim = "2 - Possui poder de decisão sobre alocação de recursos orçamentários no órgão"
-    texto_poder_nao = "1 - Não possui poder de decisão sobre alocação de recursos orçamentários no órgão"
-
-    for chave_si, dados_si in sici_keys.items():
-        titulares_do_cargo = dados_si["titulares"]
-        total_pessoas = len(titulares_do_cargo)
-        total_ordenadores = 0
+        texto_ordenador = "2 - Sim" if is_ordenador else "1 - Não"
         
-        if verificar_ordenadores:
-            total_ordenadores = sum(1 for t in titulares_do_cargo if t in set_ordenadores)
-            
-        # Regras de preenchimento e cor (Coluna 10 / J)
-        cor_fundo = None
-        if not verificar_ordenadores or total_pessoas == 0 or total_ordenadores == 0:
-            texto_ordenador = "1 - Não"
-        elif total_ordenadores == total_pessoas:
-            texto_ordenador = "2 - Sim"
-        else:
-            texto_ordenador = "⚠️ REVISÃO MANUAL: Cargo possui titulares com e sem poder de ordenação"
-            cor_fundo = COR_ALERTA
-            qtd_alertas += 1
-            
-        # Regras de preenchimento do Poder de Decisão (Coluna 12 / L)
-        cargo_norm = normalizar(dados_si['cargo'])
-        area_norm = normalizar(dados_si['area'])
-        
+        # Avaliação de Poder de Decisão
         is_excecao_poder = False
-        if cargo_norm in cargos_excecao:
+        if normalizar(cargo) in cargos_excecao:
             is_excecao_poder = True
         else:
             for area_excecao in areas_excecao_contem:
-                if area_excecao in area_norm: # Verifica se a string exigida está contida na Área
+                if area_excecao in normalizar(area): 
                     is_excecao_poder = True
                     break
 
-        if texto_ordenador == "2 - Sim" or is_excecao_poder:
-            texto_poder_decisao = texto_poder_sim
-        elif texto_ordenador.startswith("⚠️"):
-            # Se for misto, repassa o alerta também para a L, mas se for exceção, a exceção salva e recebe 2!
-            texto_poder_decisao = "⚠️ REVISÃO MANUAL: Avalie o poder de decisão deste cargo (titulares mistos)"
+        if is_ordenador or is_excecao_poder:
+            texto_poder_decisao = "2 - Possui poder de decisão sobre alocação de recursos orçamentários no órgão"
         else:
-            texto_poder_decisao = texto_poder_nao
+            texto_poder_decisao = "1 - Não possui poder de decisão sobre alocação de recursos orçamentários no órgão"
 
-        dados_si['texto_ordenador'] = texto_ordenador
-        dados_si['texto_poder_decisao'] = texto_poder_decisao
-        dados_si['cor_fundo'] = cor_fundo
+        sici_keys[chave_si] = {
+            "orgao": str(rs.get('órgão', '')),
+            "escalao": str(rs.get('escalão', '')),
+            "area": str(rs.get('área', '')),
+            "cargo": str(rs.get('cargo', '')),
+            "titular": titular_original,
+            "texto_ordenador": texto_ordenador,
+            "texto_poder_decisao": texto_poder_decisao
+        }
 
-    # --- 5. VISITAR MFE E MAPEAMENTO ---
+    # --- 4. VISITAR MFE E MAPEAMENTO ---
     print(f"[*] Lendo a planilha local '{os.path.basename(arquivo_mfe)}'...")
     try:
         df_mfe = pd.read_excel(arquivo_mfe, sheet_name=NOME_ABA)
@@ -270,7 +243,16 @@ def atualizar_planilha_mfe(dados_sici):
         if not normalizar(area_ex) and not normalizar(cargo_ex):
             continue
             
-        chave_ex = f"{normalizar(orgao_ex)}|{normalizar(escalao_ex)}|{normalizar(area_ex)}|{normalizar(cargo_ex)}"
+        # Pega o titular da MFE na Coluna 13 (M) - Índice 12 no Pandas
+        titular_ex = ""
+        if df_mfe.shape[1] > 12: # Validação segura caso a planilha não tenha a coluna 13 ainda
+            tit_val = row.iloc[12]
+            if pd.notna(tit_val):
+                titular_ex = str(tit_val).strip()
+                
+        titular_norm_ex = normalizar_nome(titular_ex)
+            
+        chave_ex = f"{normalizar(orgao_ex)}|{normalizar(escalao_ex)}|{normalizar(area_ex)}|{normalizar(cargo_ex)}|{titular_norm_ex}"
         mfe_keys[chave_ex] = {"linha": idx + 2}
 
     # MAPEAR AÇÕES
@@ -280,55 +262,63 @@ def atualizar_planilha_mfe(dados_sici):
     dados_adicionados = [] 
     linhas_para_atualizar = [] 
 
+    # Varredura MFE: Se uma linha estava agrupada sem titular, ela não vai dar match em nenhuma SICI key e será excluída!
     for chave_ex, dados_ex in mfe_keys.items():
         if chave_ex not in sici_keys:
             linhas_para_excluir.append(dados_ex['linha'])
             linha_real = dados_ex['linha'] - 2
+            
+            titular_removido = str(df_mfe.iloc[linha_real, 12]) if df_mfe.shape[1] > 12 else ""
             dados_removidos.append({
                 "orgao": str(df_mfe.iloc[linha_real, 1]),
                 "escalao": str(df_mfe.iloc[linha_real, 2]),
                 "area": str(df_mfe.iloc[linha_real, 3]),
-                "cargo": str(df_mfe.iloc[linha_real, 4])
+                "cargo": str(df_mfe.iloc[linha_real, 4]),
+                "titular": titular_removido
             })
 
+    # Varredura SICI: Se o SICI trouxe 11 nomes, ele criará 11 injeções separadas.
     for chave_si, dados_si in sici_keys.items():
         if chave_si not in mfe_keys:
-            nova_linha = [""] * 12
+            nova_linha = [""] * 13
             nova_linha[1] = dados_si['orgao']  
             nova_linha[2] = dados_si['escalao'] 
             nova_linha[3] = dados_si['area']    
             nova_linha[4] = dados_si['cargo']   
-            nova_linha[9] = dados_si['texto_ordenador']   # Coluna J
+            nova_linha[9] = dados_si['texto_ordenador']      # Coluna J
             nova_linha[11] = dados_si['texto_poder_decisao'] # Coluna L
+            nova_linha[12] = dados_si['titular']             # Coluna M 
             
-            novos_registros.append({"dados": nova_linha, "cor": dados_si['cor_fundo']})
+            novos_registros.append(nova_linha)
             dados_adicionados.append(dados_si)
         else:
             linhas_para_atualizar.append({
                 'linha': mfe_keys[chave_si]['linha'],
                 'texto_ordenador': dados_si['texto_ordenador'],
                 'texto_poder_decisao': dados_si['texto_poder_decisao'],
-                'cor': dados_si['cor_fundo']
+                'titular': dados_si['titular']
             })
 
-    # --- 6. ATUALIZAÇÃO FÍSICA NO EXCEL ---
+    # --- 5. ATUALIZAÇÃO FÍSICA NO EXCEL ---
     print(f"\n[*] Aplicando alterações no arquivo '{arquivo_mfe}'...")
     try:
         wb = openpyxl.load_workbook(arquivo_mfe)
         ws = wb[NOME_ABA]
         
-        # 1. ATUALIZAÇÕES e PINTURA
-        if linhas_para_atualizar and verificar_ordenadores:
+        # Garante a existência do cabeçalho da Coluna 13 (M)
+        cel_cabecalho_13 = ws.cell(row=1, column=13)
+        if not cel_cabecalho_13.value:
+            cel_cabecalho_13.value = "Titular"
+        
+        # 1. ATUALIZAÇÕES
+        if linhas_para_atualizar:
             for item in linhas_para_atualizar:
-                cel_j = ws.cell(row=item['linha'], column=10, value=item['texto_ordenador'])
-                cel_l = ws.cell(row=item['linha'], column=12, value=item['texto_poder_decisao'])
+                # A Coluna 13 (M) SEMPRE é atualizada para garantir o nome exato
+                ws.cell(row=item['linha'], column=13, value=item['titular'])
                 
-                if item['cor']:
-                    cel_j.fill = PatternFill(start_color=item['cor'], end_color=item['cor'], fill_type="solid")
-                    cel_l.fill = PatternFill(start_color=item['cor'], end_color=item['cor'], fill_type="solid")
-                else:
-                    cel_j.fill = PatternFill(fill_type=None) 
-                    cel_l.fill = PatternFill(fill_type=None)
+                if verificar_ordenadores:
+                    ws.cell(row=item['linha'], column=10, value=item['texto_ordenador'])
+                    ws.cell(row=item['linha'], column=12, value=item['texto_poder_decisao'])
 
         # 2. EXCLUSÕES
         if linhas_para_excluir:
@@ -344,11 +334,9 @@ def atualizar_planilha_mfe(dados_sici):
             
             linha_alvo = ultima_linha + 1
             for registro in novos_registros:
-                for col_idx, valor in enumerate(registro["dados"], start=1):
+                for col_idx, valor in enumerate(registro, start=1):
                     if valor: 
-                        cel_add = ws.cell(row=linha_alvo, column=col_idx, value=valor)
-                        if (col_idx == 10 or col_idx == 12) and registro["cor"]:
-                            cel_add.fill = PatternFill(start_color=registro["cor"], end_color=registro["cor"], fill_type="solid")
+                        ws.cell(row=linha_alvo, column=col_idx, value=valor)
                 linha_alvo += 1
 
         wb.save(arquivo_mfe)
@@ -361,7 +349,7 @@ def atualizar_planilha_mfe(dados_sici):
         messagebox.showerror("Erro: openpyxl", f"Falha ao manipular o arquivo via openpyxl:\n {e}")
         return
 
-    # --- 7. SALVAR BACKUP DE AUDITORIA ---
+    # --- 6. SALVAR BACKUP DE AUDITORIA ---
     if dados_removidos or dados_adicionados:
         agora = datetime.datetime.now().strftime("%Y%m%d_%H%M")
         registros_alterados = f"alterados_MFE_{agora}.xlsx"
@@ -369,23 +357,21 @@ def atualizar_planilha_mfe(dados_sici):
         with pd.ExcelWriter(registros_alterados, engine='openpyxl') as writer:
             if dados_removidos:
                 df_removidos = pd.DataFrame(dados_removidos)
-                df_removidos = df_removidos[['orgao', 'escalao', 'area', 'cargo']]
-                df_removidos.rename(columns={'orgao': 'Órgão', 'escalao': 'Escalão', 'area': 'Área/Título', 'cargo': 'Cargo'}, inplace=True)
+                df_removidos = df_removidos[['orgao', 'escalao', 'area', 'cargo', 'titular']]
+                df_removidos.rename(columns={'orgao': 'Órgão', 'escalao': 'Escalão', 'area': 'Área/Título', 'cargo': 'Cargo', 'titular': 'Titular'}, inplace=True)
                 df_removidos.to_excel(writer, sheet_name='Exclusões', index=False)
                 
             if dados_adicionados:
                 df_adicionados = pd.DataFrame(dados_adicionados)
-                df_adicionados = df_adicionados[['orgao', 'escalao', 'area', 'cargo']]
-                df_adicionados.rename(columns={'orgao': 'Órgão', 'escalao': 'Escalão', 'area': 'Área/Título', 'cargo': 'Cargo'}, inplace=True)
+                df_adicionados = df_adicionados[['orgao', 'escalao', 'area', 'cargo', 'titular']]
+                df_adicionados.rename(columns={'orgao': 'Órgão', 'escalao': 'Escalão', 'area': 'Área/Título', 'cargo': 'Cargo', 'titular': 'Titular'}, inplace=True)
                 df_adicionados.to_excel(writer, sheet_name='Adições', index=False)
 
     mensagem_resumo = f"Processo finalizado com sucesso!\n\n✅ Adições realizadas: {len(novos_registros)}\n❌ Exclusões realizadas: {len(linhas_para_excluir)}"
     
     if verificar_ordenadores:
-        if qtd_alertas > 0:
-            mensagem_resumo += f"\n\n⚠️ {qtd_alertas} cargos apresentaram ordenação mista e foram marcados em AMARELO na planilha para sua revisão manual."
-        else:
-            mensagem_resumo += f"\n\n⚙️ As colunas J e L foram calibradas com base nas regras e no arquivo de exceções."
+        mensagem_resumo += f"\n\n⚙️ As colunas J e L foram validadas conforme a capacidade de alocar/gerir despesas para cada titular."
+    
 
     messagebox.showinfo("Atualização Concluída", mensagem_resumo)
 
