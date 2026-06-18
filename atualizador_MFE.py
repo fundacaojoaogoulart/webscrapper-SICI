@@ -11,6 +11,78 @@ from tkinter import messagebox
 # ---------------- CONFIGURAÇÕES ----------------
 NOME_ABA = "Todas as Funções (Editável)"
 
+# ---------------- DICIONÁRIOS INTERNOS (DE-PARA) ----------------
+# TIPO DE CARGO (Mapeado a partir do Nome do Cargo)
+DIC_TIPOS = {
+    # Assessor(a)
+    "assessorchefe": "Assessor(a)",
+    "assessorchefeespeciali": "Assessor(a)",
+    "assessorchefei": "Assessor(a)",
+    "assessorchefetecnico": "Assessor(a)",
+    # Coordenador(a)
+    "coordenadorespecial": "Coordenador(a)",
+    "coordenadorespecialsubprefeito": "Coordenador(a)",
+    "coordenadorespecialdogabinetedoprefeito": "Coordenador(a)",
+    "coordenadorgeral": "Coordenador(a)",
+    "coordenadori": "Coordenador(a)",
+    "coordenadorii": "Coordenador(a)",
+    "coordenadortecnico": "Coordenador(a)",
+    # Gerente
+    "gerentedeprocessoiii": "Gerente",
+    "gerentei": "Gerente",
+    "gerenteii": "Gerente",
+    "gerenteiii": "Gerente",
+    "gerenteiv": "Gerente",
+    # Diretor(a)
+    "diretordediretoriadeautarquia": "Diretor(a)",
+    "diretorexecutivo": "Diretor(a)",
+    "diretori": "Diretor(a)",
+    "diretorii": "Diretor(a)",
+    "diretoriii": "Diretor(a)",
+    "diretoriv": "Diretor(a)",
+    # Chefe
+    "chefedacasamilitar": "Chefe",
+    "chefedegabinete": "Chefe",
+    "chefeexecutivo": "Chefe",
+    "chefeexecutivoderesilienciaeoperacoes": "Chefe",
+    # Ouvidor(a)
+    "ouvidor": "Ouvidor(a)",
+    "ouvidordenucleoi": "Ouvidor(a)",
+    "ouvidordenucleoii": "Ouvidor(a)",
+    # Presidente
+    "presidente": "Presidente",
+    "presidentedeautarquia": "Presidente",
+    "presidenteii": "Presidente",
+    # Secretário(a)
+    "secretarioespecial": "Secretário(a)",
+    "secretariomunicipal": "Secretário(a)",
+    # Subsecretário(a)
+    "subsecretario": "Subsecretário(a)",
+    # Superintendente
+    "superintendente": "Superintendente",
+    "superintendenteexecutivo": "Superintendente",
+    "superintendentetecnico": "Superintendente"
+}
+
+# MACRO ÁREA (Mapeada a partir do Órgão)
+DIC_MACROAREA = {
+    "casacivil": "Gestão", "cgm": "Gestão", "cgmrio": "Gestão", "gbp": "Gestão",
+    "gmrio": "Planejamento Urbano e Econômico", "gvp": "Gestão", "ipp": "Gestão",
+    "juvrio": "Social", "pgm": "Gestão", "previrio": "Gestão", "seacrio": "Social",
+    "secid": "Social", "seconserva": "Infraestrutura e Logística Urbana",
+    "sedecon": "Social", "sedhir": "Social", "segur": "Planejamento Urbano e Econômico",
+    "seim": "Planejamento Urbano e Econômico", "semesqv": "Social",
+    "seop": "Planejamento Urbano e Econômico", "sesrio": "Social", "sincrio": "Social",
+    "sma": "Gestão", "smac": "Planejamento Urbano e Econômico", "smas": "Social",
+    "smc": "Social", "smcg": "Gestão", "smct": "Planejamento Urbano e Econômico",
+    "smde": "Planejamento Urbano e Econômico", "smdu": "Planejamento Urbano e Econômico",
+    "sme": "Social", "smel": "Social", "smg": "Gestão", "smh": "Social",
+    "smi": "Infraestrutura e Logística Urbana", "smit": "Gestão", "smpd": "Social",
+    "smpda": "Social", "sms": "Social", "smte": "Social",
+    "smtr": "Planejamento Urbano e Econômico", "smturrio": "Planejamento Urbano e Econômico",
+    "spmrio": "Social", "smf": "Gestão"
+}
+
 # ---------------- UTILITÁRIOS ----------------
 def normalizar(texto):
     if pd.isna(texto) or not str(texto).strip(): 
@@ -37,7 +109,6 @@ def inicializar_tkinter():
     return root
 
 def carregar_excecoes_poder_decisorio():
-    """Lê as exceções de Coluna L a partir de um txt. Se não existir, cria com o padrão."""
     arquivo_config = "excecoes_poder_decisorio.txt"
     cargos = []
     areas = []
@@ -170,7 +241,7 @@ def atualizar_planilha_mfe(dados_sici):
                 messagebox.showerror("Erro", f"Falha ao processar arquivo de ordenadores:\n{e}")
                 verificar_ordenadores = False
 
-    # --- 3. AVALIAÇÃO E INDEXAÇÃO SICI (1 Pessoa = 1 Linha) ---
+    # --- 3. AVALIAÇÃO E INDEXAÇÃO SICI ---
     sici_keys = {}
     lixos = {'vago', 'vaga', 'nao informado', 'sem titular', '-'}
     
@@ -183,8 +254,6 @@ def atualizar_planilha_mfe(dados_sici):
         titular_original = str(rs.get('titular', '')).strip()
         titular_norm = normalizar_nome(titular_original)
         
-        # A nova Chave Primária inclui o Titular! 
-        # Isso quebra os cargos em múltiplas linhas automaticamente.
         chave_si = f"{org}|{esc}|{area}|{cargo}|{titular_norm}"
         
         # Avaliação de Ordenador Individual
@@ -196,11 +265,11 @@ def atualizar_planilha_mfe(dados_sici):
         
         # Avaliação de Poder de Decisão
         is_excecao_poder = False
-        if normalizar(cargo) in cargos_excecao:
+        if cargo in cargos_excecao:
             is_excecao_poder = True
         else:
             for area_excecao in areas_excecao_contem:
-                if area_excecao in normalizar(area): 
+                if area_excecao in area: 
                     is_excecao_poder = True
                     break
 
@@ -209,6 +278,13 @@ def atualizar_planilha_mfe(dados_sici):
         else:
             texto_poder_decisao = "1 - Não possui poder de decisão sobre alocação de recursos orçamentários no órgão"
 
+        # 🔥 NOVO: Consultas aos Dicionários
+        # Busca o Tipo de Cargo com base no nome do Cargo (Coluna E)
+        tipo_cargo_classificado = DIC_TIPOS.get(cargo, "")
+        
+        # Busca a Macro Área com base no Órgão (Coluna B)
+        macro_area_classificada = DIC_MACROAREA.get(org, "")
+
         sici_keys[chave_si] = {
             "orgao": str(rs.get('órgão', '')),
             "escalao": str(rs.get('escalão', '')),
@@ -216,7 +292,9 @@ def atualizar_planilha_mfe(dados_sici):
             "cargo": str(rs.get('cargo', '')),
             "titular": titular_original,
             "texto_ordenador": texto_ordenador,
-            "texto_poder_decisao": texto_poder_decisao
+            "texto_poder_decisao": texto_poder_decisao,
+            "tipo_cargo": tipo_cargo_classificado,
+            "macro_area": macro_area_classificada
         }
 
     # --- 4. VISITAR MFE E MAPEAMENTO ---
@@ -243,9 +321,8 @@ def atualizar_planilha_mfe(dados_sici):
         if not normalizar(area_ex) and not normalizar(cargo_ex):
             continue
             
-        # Pega o titular da MFE na Coluna 13 (M) - Índice 12 no Pandas
         titular_ex = ""
-        if df_mfe.shape[1] > 12: # Validação segura caso a planilha não tenha a coluna 13 ainda
+        if df_mfe.shape[1] > 12: 
             tit_val = row.iloc[12]
             if pd.notna(tit_val):
                 titular_ex = str(tit_val).strip()
@@ -262,7 +339,6 @@ def atualizar_planilha_mfe(dados_sici):
     dados_adicionados = [] 
     linhas_para_atualizar = [] 
 
-    # Varredura MFE: Se uma linha estava agrupada sem titular, ela não vai dar match em nenhuma SICI key e será excluída!
     for chave_ex, dados_ex in mfe_keys.items():
         if chave_ex not in sici_keys:
             linhas_para_excluir.append(dados_ex['linha'])
@@ -277,23 +353,26 @@ def atualizar_planilha_mfe(dados_sici):
                 "titular": titular_removido
             })
 
-    # Varredura SICI: Se o SICI trouxe 11 nomes, ele criará 11 injeções separadas.
     for chave_si, dados_si in sici_keys.items():
         if chave_si not in mfe_keys:
-            nova_linha = [""] * 13
+            nova_linha = [""] * 13 
             nova_linha[1] = dados_si['orgao']  
             nova_linha[2] = dados_si['escalao'] 
             nova_linha[3] = dados_si['area']    
             nova_linha[4] = dados_si['cargo']   
-            nova_linha[9] = dados_si['texto_ordenador']      # Coluna J
-            nova_linha[11] = dados_si['texto_poder_decisao'] # Coluna L
-            nova_linha[12] = dados_si['titular']             # Coluna M 
+            nova_linha[5] = dados_si['tipo_cargo']            # Coluna F (Tipo de Cargo)
+            nova_linha[7] = dados_si['macro_area']            # Coluna H (Macro Área)
+            nova_linha[9] = dados_si['texto_ordenador']       # Coluna J
+            nova_linha[11] = dados_si['texto_poder_decisao']  # Coluna L
+            nova_linha[12] = dados_si['titular']              # Coluna M 
             
             novos_registros.append(nova_linha)
             dados_adicionados.append(dados_si)
         else:
             linhas_para_atualizar.append({
                 'linha': mfe_keys[chave_si]['linha'],
+                'tipo_cargo': dados_si['tipo_cargo'],
+                'macro_area': dados_si['macro_area'],
                 'texto_ordenador': dados_si['texto_ordenador'],
                 'texto_poder_decisao': dados_si['texto_poder_decisao'],
                 'titular': dados_si['titular']
@@ -305,7 +384,6 @@ def atualizar_planilha_mfe(dados_sici):
         wb = openpyxl.load_workbook(arquivo_mfe)
         ws = wb[NOME_ABA]
         
-        # Garante a existência do cabeçalho da Coluna 13 (M)
         cel_cabecalho_13 = ws.cell(row=1, column=13)
         if not cel_cabecalho_13.value:
             cel_cabecalho_13.value = "Titular"
@@ -313,8 +391,13 @@ def atualizar_planilha_mfe(dados_sici):
         # 1. ATUALIZAÇÕES
         if linhas_para_atualizar:
             for item in linhas_para_atualizar:
-                # A Coluna 13 (M) SEMPRE é atualizada para garantir o nome exato
                 ws.cell(row=item['linha'], column=13, value=item['titular'])
+                
+                # Atualização obrigatória dos Dicionários (Garante a padronização no MFE)
+                if item['tipo_cargo']:
+                    ws.cell(row=item['linha'], column=6, value=item['tipo_cargo'])
+                if item['macro_area']:
+                    ws.cell(row=item['linha'], column=8, value=item['macro_area'])
                 
                 if verificar_ordenadores:
                     ws.cell(row=item['linha'], column=10, value=item['texto_ordenador'])
@@ -368,10 +451,10 @@ def atualizar_planilha_mfe(dados_sici):
                 df_adicionados.to_excel(writer, sheet_name='Adições', index=False)
 
     mensagem_resumo = f"Processo finalizado com sucesso!\n\n✅ Adições realizadas: {len(novos_registros)}\n❌ Exclusões realizadas: {len(linhas_para_excluir)}"
+    mensagem_resumo += f"\n\n⚙️ As colunas F (Tipo de Cargo) e H (Macro Área) foram calibradas usando os dicionários internos."
     
     if verificar_ordenadores:
-        mensagem_resumo += f"\n\n⚙️ As colunas J e L foram validadas conforme a capacidade de alocar/gerir despesas para cada titular."
-    
+        mensagem_resumo += f"\n⚙️ As colunas J e L foram validadas conforme a capacidade de alocar/gerir despesas para cada titular."
 
     messagebox.showinfo("Atualização Concluída", mensagem_resumo)
 
