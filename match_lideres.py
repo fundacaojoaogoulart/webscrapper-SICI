@@ -149,9 +149,9 @@ def cruzar_planilhas(dados_sici,tarefa = ""):
     
     total_lideres = len(df_c)
     if tarefa == "PLC":
-        total_comissionados = len(df_c[df_c['status'] == "líder em cargo comissionado"]) 
+        total_comissionados = len(df_c[df_c['status'] == "Líder em cargo comissionado"]) 
     elif tarefa == "PRLF":
-        total_comissionados = len(df_c[df_c['status'] == "liderança feminina em cargo comissionado"])
+        total_comissionados = len(df_c[df_c['status'] == "Liderança feminina em cargo comissionado"])
     
     resumo_msg = f"✅ Cruzamento Concluído!\n\nTotal de líderes validados: {total_lideres}\nEncontrados em cargos comissionados: {total_comissionados}\n\nArquivo '{ARQUIVO_C}' salvo com sucesso!"
     
