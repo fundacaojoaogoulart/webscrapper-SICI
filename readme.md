@@ -21,7 +21,7 @@ O painel centraliza o acesso a três rotinas principais:
 
 Utilize o comando abaixo para gerar uma nova versão do webscraper do sici
 ```bash
-pyinstaller --clean --onefile --windowed --collect-all selenium --icon=icon.ico painel_principal_com_nomes.py
+pyinstaller --clean --onedir --windowed --collect-all selenium --collect-all sklearn --add-data "model_fjg.pkl;." --add-data "vectorizer_fjg.pkl;." --icon=icon.ico painel_principal_com_nomes.py
 ```
 
 
