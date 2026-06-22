@@ -1,5 +1,6 @@
 import pandas as pd
 import openpyxl
+from openpyxl.styles import PatternFill
 import unicodedata
 import re
 import datetime
@@ -8,63 +9,32 @@ import tkinter as tk
 from tkinter import filedialog
 from tkinter import messagebox
 
+import area_negocio_ml # Módulo de Machine Learning
+
 # ---------------- CONFIGURAÇÕES ----------------
 NOME_ABA = "Todas as Funções (Editável)"
+COR_ALERTA = "FFFF00" # Amarelo
 
 # ---------------- DICIONÁRIOS INTERNOS (DE-PARA) ----------------
-# TIPO DE CARGO (Mapeado a partir do Nome do Cargo)
 DIC_TIPOS = {
-    # Assessor(a)
-    "assessorchefe": "Assessor(a)",
-    "assessorchefeespeciali": "Assessor(a)",
-    "assessorchefei": "Assessor(a)",
-    "assessorchefetecnico": "Assessor(a)",
-    # Coordenador(a)
-    "coordenadorespecial": "Coordenador(a)",
-    "coordenadorespecialsubprefeito": "Coordenador(a)",
-    "coordenadorespecialdogabinetedoprefeito": "Coordenador(a)",
-    "coordenadorgeral": "Coordenador(a)",
-    "coordenadori": "Coordenador(a)",
-    "coordenadorii": "Coordenador(a)",
-    "coordenadortecnico": "Coordenador(a)",
-    # Gerente
-    "gerentedeprocessoiii": "Gerente",
-    "gerentei": "Gerente",
-    "gerenteii": "Gerente",
-    "gerenteiii": "Gerente",
-    "gerenteiv": "Gerente",
-    # Diretor(a)
-    "diretordediretoriadeautarquia": "Diretor(a)",
-    "diretorexecutivo": "Diretor(a)",
-    "diretori": "Diretor(a)",
-    "diretorii": "Diretor(a)",
-    "diretoriii": "Diretor(a)",
-    "diretoriv": "Diretor(a)",
-    # Chefe
-    "chefedacasamilitar": "Chefe",
-    "chefedegabinete": "Chefe",
-    "chefeexecutivo": "Chefe",
-    "chefeexecutivoderesilienciaeoperacoes": "Chefe",
-    # Ouvidor(a)
-    "ouvidor": "Ouvidor(a)",
-    "ouvidordenucleoi": "Ouvidor(a)",
-    "ouvidordenucleoii": "Ouvidor(a)",
-    # Presidente
-    "presidente": "Presidente",
-    "presidentedeautarquia": "Presidente",
-    "presidenteii": "Presidente",
-    # Secretário(a)
-    "secretarioespecial": "Secretário(a)",
-    "secretariomunicipal": "Secretário(a)",
-    # Subsecretário(a)
+    "assessorchefe": "Assessor(a)", "assessorchefeespeciali": "Assessor(a)",
+    "assessorchefei": "Assessor(a)", "assessorchefetecnico": "Assessor(a)",
+    "coordenadorespecial": "Coordenador(a)", "coordenadorespecialsubprefeito": "Coordenador(a)",
+    "coordenadorespecialdogabinetedoprefeito": "Coordenador(a)", "coordenadorgeral": "Coordenador(a)",
+    "coordenadori": "Coordenador(a)", "coordenadorii": "Coordenador(a)", "coordenadortecnico": "Coordenador(a)",
+    "gerentedeprocessoiii": "Gerente", "gerentei": "Gerente", "gerenteii": "Gerente",
+    "gerenteiii": "Gerente", "gerenteiv": "Gerente",
+    "diretordediretoriadeautarquia": "Diretor(a)", "diretorexecutivo": "Diretor(a)",
+    "diretori": "Diretor(a)", "diretorii": "Diretor(a)", "diretoriii": "Diretor(a)", "diretoriv": "Diretor(a)",
+    "chefedacasamilitar": "Chefe", "chefedegabinete": "Chefe",
+    "chefeexecutivo": "Chefe", "chefeexecutivoderesilienciaeoperacoes": "Chefe",
+    "ouvidor": "Ouvidor(a)", "ouvidordenucleoi": "Ouvidor(a)", "ouvidordenucleoii": "Ouvidor(a)",
+    "presidente": "Presidente", "presidentedeautarquia": "Presidente", "presidenteii": "Presidente",
+    "secretarioespecial": "Secretário(a)", "secretariomunicipal": "Secretário(a)",
     "subsecretario": "Subsecretário(a)",
-    # Superintendente
-    "superintendente": "Superintendente",
-    "superintendenteexecutivo": "Superintendente",
-    "superintendentetecnico": "Superintendente"
+    "superintendente": "Superintendente", "superintendenteexecutivo": "Superintendente", "superintendentetecnico": "Superintendente"
 }
 
-# MACRO ÁREA (Mapeada a partir do Órgão)
 DIC_MACROAREA = {
     "casacivil": "Gestão", "cgm": "Gestão", "cgmrio": "Gestão", "gbp": "Gestão",
     "gmrio": "Planejamento Urbano e Econômico", "gvp": "Gestão", "ipp": "Gestão",
@@ -241,14 +211,27 @@ def atualizar_planilha_mfe(dados_sici):
                 messagebox.showerror("Erro", f"Falha ao processar arquivo de ordenadores:\n{e}")
                 verificar_ordenadores = False
 
-    # --- 3. AVALIAÇÃO E INDEXAÇÃO SICI ---
+    # --- 3. MACHINE LEARNING (Predição em Lote) ---
+    print("[*] Acionando a Inteligência Artificial para as Áreas de Negócio...")
+    areas_unicas_originais = df_sici['área'].fillna("").unique().tolist()
+    areas_negocio_previstas = area_negocio_ml.prever_area_negocio(areas_unicas_originais)
+    
+    # Cria um de-para do modelo: { "Área original": "Área Prevista ML" }
+    dic_ml_areas = dict(zip(areas_unicas_originais, areas_negocio_previstas))
+
+    # --- 4. AVALIAÇÃO E INDEXAÇÃO SICI ---
     sici_keys = {}
     lixos = {'vago', 'vaga', 'nao informado', 'sem titular', '-'}
     
     for _, rs in df_sici.iterrows():
-        org = normalizar(str(rs.get('órgão', '')))
+        org_original = str(rs.get('órgão', ''))
+        org = normalizar(org_original)
+        
         esc = normalizar(str(rs.get('escalão', '')))
-        area = normalizar(str(rs.get('área', '')))
+        
+        area_original = str(rs.get('área', ''))
+        area = normalizar(area_original)
+        
         cargo = normalizar(str(rs.get('cargo', '')))
         
         titular_original = str(rs.get('titular', '')).strip()
@@ -256,14 +239,12 @@ def atualizar_planilha_mfe(dados_sici):
         
         chave_si = f"{org}|{esc}|{area}|{cargo}|{titular_norm}"
         
-        # Avaliação de Ordenador Individual
         is_ordenador = False
         if verificar_ordenadores and titular_norm and titular_norm not in lixos and len(titular_norm) > 2:
             is_ordenador = titular_norm in set_ordenadores
             
         texto_ordenador = "2 - Sim" if is_ordenador else "1 - Não"
         
-        # Avaliação de Poder de Decisão
         is_excecao_poder = False
         if cargo in cargos_excecao:
             is_excecao_poder = True
@@ -278,26 +259,26 @@ def atualizar_planilha_mfe(dados_sici):
         else:
             texto_poder_decisao = "1 - Não possui poder de decisão sobre alocação de recursos orçamentários no órgão"
 
-        # 🔥 NOVO: Consultas aos Dicionários
-        # Busca o Tipo de Cargo com base no nome do Cargo (Coluna E)
         tipo_cargo_classificado = DIC_TIPOS.get(cargo, "")
-        
-        # Busca a Macro Área com base no Órgão (Coluna B)
         macro_area_classificada = DIC_MACROAREA.get(org, "")
+        
+        # Resgata a área classificada pela IA no Dicionário
+        area_negocio_classificada = dic_ml_areas.get(area_original, "")
 
         sici_keys[chave_si] = {
-            "orgao": str(rs.get('órgão', '')),
+            "orgao": org_original,
             "escalao": str(rs.get('escalão', '')),
-            "area": str(rs.get('área', '')),
+            "area": area_original,
             "cargo": str(rs.get('cargo', '')),
             "titular": titular_original,
             "texto_ordenador": texto_ordenador,
             "texto_poder_decisao": texto_poder_decisao,
             "tipo_cargo": tipo_cargo_classificado,
-            "macro_area": macro_area_classificada
+            "macro_area": macro_area_classificada,
+            "area_negocio": area_negocio_classificada 
         }
 
-    # --- 4. VISITAR MFE E MAPEAMENTO ---
+    # --- 5. VISITAR MFE E MAPEAMENTO ---
     print(f"[*] Lendo a planilha local '{os.path.basename(arquivo_mfe)}'...")
     try:
         df_mfe = pd.read_excel(arquivo_mfe, sheet_name=NOME_ABA)
@@ -360,8 +341,9 @@ def atualizar_planilha_mfe(dados_sici):
             nova_linha[2] = dados_si['escalao'] 
             nova_linha[3] = dados_si['area']    
             nova_linha[4] = dados_si['cargo']   
-            nova_linha[5] = dados_si['tipo_cargo']            # Coluna F (Tipo de Cargo)
-            nova_linha[7] = dados_si['macro_area']            # Coluna H (Macro Área)
+            nova_linha[5] = dados_si['tipo_cargo']            # Coluna F 
+            nova_linha[6] = dados_si['area_negocio']         # Coluna G (ML)
+            nova_linha[7] = dados_si['macro_area']            # Coluna H 
             nova_linha[9] = dados_si['texto_ordenador']       # Coluna J
             nova_linha[11] = dados_si['texto_poder_decisao']  # Coluna L
             nova_linha[12] = dados_si['titular']              # Coluna M 
@@ -373,12 +355,13 @@ def atualizar_planilha_mfe(dados_sici):
                 'linha': mfe_keys[chave_si]['linha'],
                 'tipo_cargo': dados_si['tipo_cargo'],
                 'macro_area': dados_si['macro_area'],
+                'area_negocio': dados_si['area_negocio'],
                 'texto_ordenador': dados_si['texto_ordenador'],
                 'texto_poder_decisao': dados_si['texto_poder_decisao'],
                 'titular': dados_si['titular']
             })
 
-    # --- 5. ATUALIZAÇÃO FÍSICA NO EXCEL ---
+    # --- 6. ATUALIZAÇÃO FÍSICA NO EXCEL ---
     print(f"\n[*] Aplicando alterações no arquivo '{arquivo_mfe}'...")
     try:
         wb = openpyxl.load_workbook(arquivo_mfe)
@@ -393,11 +376,17 @@ def atualizar_planilha_mfe(dados_sici):
             for item in linhas_para_atualizar:
                 ws.cell(row=item['linha'], column=13, value=item['titular'])
                 
-                # Atualização obrigatória dos Dicionários (Garante a padronização no MFE)
                 if item['tipo_cargo']:
                     ws.cell(row=item['linha'], column=6, value=item['tipo_cargo'])
                 if item['macro_area']:
                     ws.cell(row=item['linha'], column=8, value=item['macro_area'])
+                    
+                # Injeta a Área de Negócio da Inteligência Artificial (G = 7)
+                cel_k = ws.cell(row=item['linha'], column=7, value=item['area_negocio'])
+                if item['area_negocio'].startswith("⚠️"):
+                    cel_k.fill = PatternFill(start_color=COR_ALERTA, end_color=COR_ALERTA, fill_type="solid")
+                else:
+                    cel_k.fill = PatternFill(fill_type=None)
                 
                 if verificar_ordenadores:
                     ws.cell(row=item['linha'], column=10, value=item['texto_ordenador'])
@@ -419,7 +408,11 @@ def atualizar_planilha_mfe(dados_sici):
             for registro in novos_registros:
                 for col_idx, valor in enumerate(registro, start=1):
                     if valor: 
-                        ws.cell(row=linha_alvo, column=col_idx, value=valor)
+                        cel_add = ws.cell(row=linha_alvo, column=col_idx, value=valor)
+                        # Pinta a Coluna 7 (G) de Amarelo se o ML der alerta em novos registros
+                        if col_idx == 7 and str(valor).startswith("⚠️"):
+                            cel_add.fill = PatternFill(start_color=COR_ALERTA, end_color=COR_ALERTA, fill_type="solid")
+                            
                 linha_alvo += 1
 
         wb.save(arquivo_mfe)
@@ -432,7 +425,7 @@ def atualizar_planilha_mfe(dados_sici):
         messagebox.showerror("Erro: openpyxl", f"Falha ao manipular o arquivo via openpyxl:\n {e}")
         return
 
-    # --- 6. SALVAR BACKUP DE AUDITORIA ---
+    # --- 7. SALVAR BACKUP DE AUDITORIA ---
     if dados_removidos or dados_adicionados:
         agora = datetime.datetime.now().strftime("%Y%m%d_%H%M")
         registros_alterados = f"alterados_MFE_{agora}.xlsx"
@@ -451,7 +444,7 @@ def atualizar_planilha_mfe(dados_sici):
                 df_adicionados.to_excel(writer, sheet_name='Adições', index=False)
 
     mensagem_resumo = f"Processo finalizado com sucesso!\n\n✅ Adições realizadas: {len(novos_registros)}\n❌ Exclusões realizadas: {len(linhas_para_excluir)}"
-    mensagem_resumo += f"\n\n⚙️ As colunas F (Tipo de Cargo) e H (Macro Área) foram calibradas usando os dicionários internos."
+    mensagem_resumo += f"\n\n⚙️ A coluna K (Área de Negócio) foi preenchida utilizando Inteligência Artificial."
     
     if verificar_ordenadores:
         mensagem_resumo += f"\n⚙️ As colunas J e L foram validadas conforme a capacidade de alocar/gerir despesas para cada titular."
