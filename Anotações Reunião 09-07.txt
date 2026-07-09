@@ -1,0 +1,13 @@
+- machine learning na área de negócio não está preenchendo?
+- implementar o botão do matheus no fluxo principal do atualizador
+- ordena equipe? sim para todos, exceto para todos os ouvidores (marcar para verificação manual)
+- fazer um de-para Tipo de Cargo
+- Verificar a função para preenchimento do Tipo de Cargo
+- Verificar se as linhas que "não mudaram" estão realmente sendo validadas
+- Parar de verificar mudanças, apenas assumir o sici como o que está certo
+- Parar de pedir uma planilha do MFE, apenas usar uma planilha base para o cabeçalho formatação
+- Criar um config para a área macro temática
+- Criar um config para do nome do cargo para o tipo do cargo (existe a planilha dicionarios, converter em txt de config)
+- Melhorar a planilha de cruzamento PLC, deixar mais enxuta
+- Planilha de cruzamento deve mostrar só os líderes em funções estratégicas
+

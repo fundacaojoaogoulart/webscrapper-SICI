@@ -128,22 +128,17 @@ def selecionar_arquivo_sici_interface():
         filetypes=[("Arquivos Excel", "*.xlsx"), ("Todos os Arquivos", "*.*")]
     )
 
-def selecionar_planilha_mfe_interface():
-    messagebox.showinfo("Selecione um arquivo", "Agora, selecione a planilha do MFE que será ATUALIZADA.")
-    return filedialog.askopenfilename(
-        title="2. Selecione a planilha do MFE",
-        filetypes=[("Arquivos Excel", "*.xlsx"), ("Todos os Arquivos", "*.*")]
-    )
 
 # ---------------- LÓGICA PRINCIPAL ----------------
 def atualizar_planilha_mfe(dados_sici):
     
     root = inicializar_tkinter()
-    arquivo_mfe = selecionar_planilha_mfe_interface()
+    arquivo_base = "MFE_Base.xlsx"
+    arquivo_saida = "MFE_Atualizada.xlsx"
     
-    if not arquivo_mfe:
-        print("[ALERTA] Nenhuma planilha MFE foi selecionada.")
-        messagebox.showwarning("Aviso", "Nenhuma planilha MFE foi selecionada. Operação cancelada.")
+    if not os.path.exists(arquivo_base):
+        print(f"[ALERTA] Planilha base '{arquivo_base}' não encontrada.")
+        messagebox.showwarning("Aviso", f"Planilha base '{arquivo_base}' não encontrada no diretório atual. Operação cancelada.")
         return 
 
     # --- 1. CARREGAR OS DADOS DO SICI ---
@@ -278,133 +273,42 @@ def atualizar_planilha_mfe(dados_sici):
             "area_negocio": area_negocio_classificada 
         }
 
-    # --- 5. VISITAR MFE E MAPEAMENTO ---
-    print(f"[*] Lendo a planilha local '{os.path.basename(arquivo_mfe)}'...")
-    try:
-        df_mfe = pd.read_excel(arquivo_mfe, sheet_name=NOME_ABA)
-    except Exception as e:
-        messagebox.showerror("Erro de Arquivo", f"Falha ao ler MFE:\n{e}")
-        return
-
-    orgaos_presentes_sici = df_sici['órgão'].dropna().unique().tolist()
-    orgaos_normalizados_sici = [normalizar(org) for org in orgaos_presentes_sici]
-
-    mfe_keys = {}
-    for idx, row in df_mfe.iterrows():
-        orgao_ex = str(row.iloc[1]) if pd.notna(row.iloc[1]) else "" 
-        if normalizar(orgao_ex) not in orgaos_normalizados_sici:
-            continue
-
-        escalao_ex = str(row.iloc[2]) if pd.notna(row.iloc[2]) else "" 
-        area_ex = str(row.iloc[3]) if pd.notna(row.iloc[3]) else ""  
-        cargo_ex = str(row.iloc[4]) if pd.notna(row.iloc[4]) else "" 
-        
-        if not normalizar(area_ex) and not normalizar(cargo_ex):
-            continue
-            
-        titular_ex = ""
-        if df_mfe.shape[1] > 12: 
-            tit_val = row.iloc[12]
-            if pd.notna(tit_val):
-                titular_ex = str(tit_val).strip()
-                
-        titular_norm_ex = normalizar_nome(titular_ex)
-            
-        chave_ex = f"{normalizar(orgao_ex)}|{normalizar(escalao_ex)}|{normalizar(area_ex)}|{normalizar(cargo_ex)}|{titular_norm_ex}"
-        mfe_keys[chave_ex] = {"linha": idx + 2}
-
-    # MAPEAR AÇÕES
-    linhas_para_excluir = []
-    dados_removidos = [] 
+    # --- 5. PREPARAR DADOS PARA A PLANILHA NOVA ---
     novos_registros = [] 
-    dados_adicionados = [] 
-    linhas_para_atualizar = [] 
-
-    for chave_ex, dados_ex in mfe_keys.items():
-        if chave_ex not in sici_keys:
-            linhas_para_excluir.append(dados_ex['linha'])
-            linha_real = dados_ex['linha'] - 2
-            
-            titular_removido = str(df_mfe.iloc[linha_real, 12]) if df_mfe.shape[1] > 12 else ""
-            dados_removidos.append({
-                "orgao": str(df_mfe.iloc[linha_real, 1]),
-                "escalao": str(df_mfe.iloc[linha_real, 2]),
-                "area": str(df_mfe.iloc[linha_real, 3]),
-                "cargo": str(df_mfe.iloc[linha_real, 4]),
-                "titular": titular_removido
-            })
 
     for chave_si, dados_si in sici_keys.items():
-        if chave_si not in mfe_keys:
-            nova_linha = [""] * 13 
-            nova_linha[1] = dados_si['orgao']  
-            nova_linha[2] = dados_si['escalao'] 
-            nova_linha[3] = dados_si['area']    
-            nova_linha[4] = dados_si['cargo']   
-            nova_linha[5] = dados_si['tipo_cargo']            # Coluna F 
-            nova_linha[6] = dados_si['area_negocio']         # Coluna G (ML)
-            nova_linha[7] = dados_si['macro_area']            # Coluna H 
-            nova_linha[9] = dados_si['texto_ordenador']       # Coluna J
-            nova_linha[11] = dados_si['texto_poder_decisao']  # Coluna L
-            nova_linha[12] = dados_si['titular']              # Coluna M 
-            
-            novos_registros.append(nova_linha)
-            dados_adicionados.append(dados_si)
-        else:
-            linhas_para_atualizar.append({
-                'linha': mfe_keys[chave_si]['linha'],
-                'tipo_cargo': dados_si['tipo_cargo'],
-                'macro_area': dados_si['macro_area'],
-                'area_negocio': dados_si['area_negocio'],
-                'texto_ordenador': dados_si['texto_ordenador'],
-                'texto_poder_decisao': dados_si['texto_poder_decisao'],
-                'titular': dados_si['titular']
-            })
+        nova_linha = [""] * 13 
+        nova_linha[1] = dados_si['orgao']  
+        nova_linha[2] = dados_si['escalao'] 
+        nova_linha[3] = dados_si['area']    
+        nova_linha[4] = dados_si['cargo']   
+        nova_linha[5] = dados_si['tipo_cargo']            # Coluna F 
+        nova_linha[6] = dados_si['area_negocio']         # Coluna G (ML)
+        nova_linha[7] = dados_si['macro_area']            # Coluna H 
+        nova_linha[9] = dados_si['texto_ordenador']       # Coluna J
+        nova_linha[11] = dados_si['texto_poder_decisao']  # Coluna L
+        nova_linha[12] = dados_si['titular']              # Coluna M 
+        
+        novos_registros.append(nova_linha)
 
     # --- 6. ATUALIZAÇÃO FÍSICA NO EXCEL ---
-    print(f"\n[*] Aplicando alterações no arquivo '{arquivo_mfe}'...")
+    import shutil
+    print(f"\n[*] Criando '{arquivo_saida}' a partir de '{arquivo_base}'...")
     try:
-        wb = openpyxl.load_workbook(arquivo_mfe)
+        shutil.copy(arquivo_base, arquivo_saida)
+        
+        wb = openpyxl.load_workbook(arquivo_saida)
         ws = wb[NOME_ABA]
         
         cel_cabecalho_13 = ws.cell(row=1, column=13)
         if not cel_cabecalho_13.value:
             cel_cabecalho_13.value = "Titular"
         
-        # 1. ATUALIZAÇÕES
-        if linhas_para_atualizar:
-            for item in linhas_para_atualizar:
-                ws.cell(row=item['linha'], column=13, value=item['titular'])
-                
-                if item['tipo_cargo']:
-                    ws.cell(row=item['linha'], column=6, value=item['tipo_cargo'])
-                if item['macro_area']:
-                    ws.cell(row=item['linha'], column=8, value=item['macro_area'])
-                    
-                # Injeta a Área de Negócio da Inteligência Artificial (G = 7)
-                cel_k = ws.cell(row=item['linha'], column=7, value=item['area_negocio'])
-                if item['area_negocio'].startswith("⚠️"):
-                    cel_k.fill = PatternFill(start_color=COR_ALERTA, end_color=COR_ALERTA, fill_type="solid")
-                else:
-                    cel_k.fill = PatternFill(fill_type=None)
-                
-                if verificar_ordenadores:
-                    ws.cell(row=item['linha'], column=10, value=item['texto_ordenador'])
-                    ws.cell(row=item['linha'], column=12, value=item['texto_poder_decisao'])
-
-        # 2. EXCLUSÕES
-        if linhas_para_excluir:
-            linhas_para_excluir.sort(reverse=True)
-            for linha in linhas_para_excluir:
-                ws.delete_rows(linha)
-
-        # 3. ADIÇÕES
+        if ws.max_row > 1:
+            ws.delete_rows(2, ws.max_row - 1)
+        
         if novos_registros:
-            ultima_linha = ws.max_row
-            while ultima_linha > 1 and ws.cell(row=ultima_linha, column=2).value is None:
-                ultima_linha -= 1
-            
-            linha_alvo = ultima_linha + 1
+            linha_alvo = 2
             for registro in novos_registros:
                 for col_idx, valor in enumerate(registro, start=1):
                     if valor: 
@@ -415,36 +319,18 @@ def atualizar_planilha_mfe(dados_sici):
                             
                 linha_alvo += 1
 
-        wb.save(arquivo_mfe)
-        print("\n[!] Planilha MFE atualizada salva com sucesso!")
+        wb.save(arquivo_saida)
+        print("\n[!] Planilha MFE Atualizada gerada com sucesso!")
         
     except PermissionError:
-        messagebox.showerror("Erro: Arquivo aberto", f"O arquivo {os.path.basename(arquivo_mfe)} está aberto no Excel, feche-o e tente novamente.")
+        messagebox.showerror("Erro: Arquivo aberto", f"O arquivo {arquivo_saida} ou {arquivo_base} está aberto no Excel, feche-o e tente novamente.")
         return
     except Exception as e:
         messagebox.showerror("Erro: openpyxl", f"Falha ao manipular o arquivo via openpyxl:\n {e}")
         return
 
-    # --- 7. SALVAR BACKUP DE AUDITORIA ---
-    if dados_removidos or dados_adicionados:
-        agora = datetime.datetime.now().strftime("%Y%m%d_%H%M")
-        registros_alterados = f"alterados_MFE_{agora}.xlsx"
-        
-        with pd.ExcelWriter(registros_alterados, engine='openpyxl') as writer:
-            if dados_removidos:
-                df_removidos = pd.DataFrame(dados_removidos)
-                df_removidos = df_removidos[['orgao', 'escalao', 'area', 'cargo', 'titular']]
-                df_removidos.rename(columns={'orgao': 'Órgão', 'escalao': 'Escalão', 'area': 'Área/Título', 'cargo': 'Cargo', 'titular': 'Titular'}, inplace=True)
-                df_removidos.to_excel(writer, sheet_name='Exclusões', index=False)
-                
-            if dados_adicionados:
-                df_adicionados = pd.DataFrame(dados_adicionados)
-                df_adicionados = df_adicionados[['orgao', 'escalao', 'area', 'cargo', 'titular']]
-                df_adicionados.rename(columns={'orgao': 'Órgão', 'escalao': 'Escalão', 'area': 'Área/Título', 'cargo': 'Cargo', 'titular': 'Titular'}, inplace=True)
-                df_adicionados.to_excel(writer, sheet_name='Adições', index=False)
-
-    mensagem_resumo = f"Processo finalizado com sucesso!\n\n✅ Adições realizadas: {len(novos_registros)}\n❌ Exclusões realizadas: {len(linhas_para_excluir)}"
-    mensagem_resumo += f"\n\n⚙️ A coluna K (Área de Negócio) foi preenchida utilizando Inteligência Artificial."
+    mensagem_resumo = f"Processo finalizado com sucesso!\n\n✅ Nova planilha '{arquivo_saida}' gerada com {len(novos_registros)} registros."
+    mensagem_resumo += f"\n\n⚙️ A coluna G (Área de Negócio) foi preenchida utilizando Inteligência Artificial."
     
     if verificar_ordenadores:
         mensagem_resumo += f"\n⚙️ As colunas J e L foram validadas conforme a capacidade de alocar/gerir despesas para cada titular."
