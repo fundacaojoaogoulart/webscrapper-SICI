@@ -121,20 +121,29 @@ def cruzar_planilhas(dados_sici,tarefa = ""):
     if tarefa == "PLC":
         df_c['status'] = np.where(
             df_c['chave_nome_b'].notna(), 
-            "Líder em cargo comissionado", 
-            "Não está em cargo comissionado"
+            "Líder em Função Estratégica, nos critérios do MFE", 
+            "Não está ocupando função estratégica, nos critérios do MFE"
         )
     elif tarefa == "PRLF":
             df_c['status'] = np.where(
             df_c['chave_nome_b'].notna(), 
-            "Liderança feminina em cargo comissionado", 
-            "Não está em cargo comissionado"
+            "Liderança feminina em Função Estratégica, nos critérios do MFE", 
+            "Não está ocupando função estratégica, nos critérios do MFE"
         )
     df_c = df_c.drop(columns=['chave_nome_a', 'chave_nome_b'])
 
-    colunas_originais_a = [col for col in df_a.columns if col != 'chave_nome_a']
-    nova_ordem = colunas_originais_a + ['status', 'área', 'cargo']
-    df_c = df_c[nova_ordem]
+    colunas_finais = ['NOME']
+    if 'CODIGO_LC' in df_c.columns:
+        colunas_finais.append('CODIGO_LC')
+        
+    colunas_finais.extend(['status', 'área', 'cargo'])
+    
+    df_c = df_c[colunas_finais]
+    df_c = df_c.rename(columns={
+        'status': 'STATUS',
+        'área': 'ÁREA',
+        'cargo': 'CARGO'
+    })
 
     print(f"[*] Salvando o resultado final em '{ARQUIVO_C}'...")
     try:
@@ -149,9 +158,9 @@ def cruzar_planilhas(dados_sici,tarefa = ""):
     
     total_lideres = len(df_c)
     if tarefa == "PLC":
-        total_comissionados = len(df_c[df_c['status'] == "Líder em cargo comissionado"]) 
+        total_comissionados = len(df_c[df_c['STATUS'] == "Líder em Função Estratégica, nos critérios do MFE"]) 
     elif tarefa == "PRLF":
-        total_comissionados = len(df_c[df_c['status'] == "Liderança feminina em cargo comissionado"])
+        total_comissionados = len(df_c[df_c['STATUS'] == "Liderança feminina em Função Estratégica, nos critérios do MFE"])
     
     resumo_msg = f"✅ Cruzamento Concluído!\n\nTotal de líderes validados: {total_lideres}\nEncontrados em cargos comissionados: {total_comissionados}\n\nArquivo '{ARQUIVO_C}' salvo com sucesso!"
     
