@@ -10,48 +10,18 @@ from tkinter import filedialog
 from tkinter import messagebox
 
 import area_negocio_ml # Módulo de Machine Learning
+import calculadora_tercis
+import config_manager
 
 # ---------------- CONFIGURAÇÕES ----------------
 NOME_ABA = "Todas as Funções (Editável)"
 COR_ALERTA = "FFFF00" # Amarelo
 
 # ---------------- DICIONÁRIOS INTERNOS (DE-PARA) ----------------
-DIC_TIPOS = {
-    "assessorchefe": "Assessor(a)", "assessorchefeespeciali": "Assessor(a)",
-    "assessorchefei": "Assessor(a)", "assessorchefetecnico": "Assessor(a)",
-    "coordenadorespecial": "Coordenador(a)", "coordenadorespecialsubprefeito": "Coordenador(a)",
-    "coordenadorespecialdogabinetedoprefeito": "Coordenador(a)", "coordenadorgeral": "Coordenador(a)",
-    "coordenadori": "Coordenador(a)", "coordenadorii": "Coordenador(a)", "coordenadortecnico": "Coordenador(a)",
-    "gerentedeprocessoiii": "Gerente", "gerentei": "Gerente", "gerenteii": "Gerente",
-    "gerenteiii": "Gerente", "gerenteiv": "Gerente",
-    "diretordediretoriadeautarquia": "Diretor(a)", "diretorexecutivo": "Diretor(a)",
-    "diretori": "Diretor(a)", "diretorii": "Diretor(a)", "diretoriii": "Diretor(a)", "diretoriv": "Diretor(a)",
-    "chefedacasamilitar": "Chefe", "chefedegabinete": "Chefe",
-    "chefeexecutivo": "Chefe", "chefeexecutivoderesilienciaeoperacoes": "Chefe",
-    "ouvidor": "Ouvidor(a)", "ouvidordenucleoi": "Ouvidor(a)", "ouvidordenucleoii": "Ouvidor(a)",
-    "presidente": "Presidente", "presidentedeautarquia": "Presidente", "presidenteii": "Presidente",
-    "secretarioespecial": "Secretário(a)", "secretariomunicipal": "Secretário(a)",
-    "subsecretario": "Subsecretário(a)",
-    "superintendente": "Superintendente", "superintendenteexecutivo": "Superintendente", "superintendentetecnico": "Superintendente"
-}
 
-DIC_MACROAREA = {
-    "casacivil": "Gestão", "cgm": "Gestão", "cgmrio": "Gestão", "gbp": "Gestão",
-    "gmrio": "Planejamento Urbano e Econômico", "gvp": "Gestão", "ipp": "Gestão",
-    "juvrio": "Social", "pgm": "Gestão", "previrio": "Gestão", "seacrio": "Social",
-    "secid": "Social", "seconserva": "Infraestrutura e Logística Urbana",
-    "sedecon": "Social", "sedhir": "Social", "segur": "Planejamento Urbano e Econômico",
-    "seim": "Planejamento Urbano e Econômico", "semesqv": "Social",
-    "seop": "Planejamento Urbano e Econômico", "sesrio": "Social", "sincrio": "Social",
-    "sma": "Gestão", "smac": "Planejamento Urbano e Econômico", "smas": "Social",
-    "smc": "Social", "smcg": "Gestão", "smct": "Planejamento Urbano e Econômico",
-    "smde": "Planejamento Urbano e Econômico", "smdu": "Planejamento Urbano e Econômico",
-    "sme": "Social", "smel": "Social", "smg": "Gestão", "smh": "Social",
-    "smi": "Infraestrutura e Logística Urbana", "smit": "Gestão", "smpd": "Social",
-    "smpda": "Social", "sms": "Social", "smte": "Social",
-    "smtr": "Planejamento Urbano e Econômico", "smturrio": "Planejamento Urbano e Econômico",
-    "spmrio": "Social", "smf": "Gestão"
-}
+
+
+
 
 # ---------------- UTILITÁRIOS ----------------
 def normalizar(texto):
@@ -77,49 +47,6 @@ def inicializar_tkinter():
         root.withdraw()
         root.attributes("-topmost", True)
     return root
-
-def carregar_excecoes_poder_decisorio():
-    arquivo_config = "excecoes_poder_decisorio.txt"
-    cargos = []
-    areas = []
-    
-    if not os.path.exists(arquivo_config):
-        with open(arquivo_config, "w", encoding="utf-8") as f:
-            f.write("# Este arquivo define regras extras para a coluna de Poder de Decisão (Coluna L).\n")
-            f.write("# O sistema ignora maiúsculas, minúsculas e acentos na hora da leitura.\n\n")
-            f.write("[CARGO_EXATO]\n")
-            f.write("Chefe de Gabinete\n")
-            f.write("Procurador Geral do Município\n")
-            f.write("Subprocurador Geral do Município\n")
-            f.write("Controlador Geral\n")
-            f.write("Secretário Especial\n")
-            f.write("Secretário Municipal\n")
-            f.write("Subsecretário\n")
-            f.write("Inspetor Geral\n")
-            f.write("Presidente de Autarquia\n")
-            f.write("Subcontrolador\n\n")
-            f.write("[AREA_CONTEM]\n")
-            f.write("Coordenadoria Regional de Educação\n")
-    
-    modo = None
-    with open(arquivo_config, "r", encoding="utf-8") as f:
-        for linha in f:
-            linha = linha.strip()
-            if not linha or linha.startswith("#"):
-                continue
-            if linha == "[CARGO_EXATO]":
-                modo = "cargo"
-                continue
-            if linha == "[AREA_CONTEM]":
-                modo = "area"
-                continue
-                
-            if modo == "cargo":
-                cargos.append(normalizar(linha))
-            elif modo == "area":
-                areas.append(normalizar(linha))
-    
-    return set(cargos), areas
 
 def selecionar_arquivo_sici_interface():
     messagebox.showinfo("Selecione um arquivo", "Selecione a planilha extraída do SICI que contém os dados novos.")
@@ -153,8 +80,12 @@ def atualizar_planilha_mfe(dados_sici):
         print("[ALERTA] Os dados do SICI estão vazios.")
         return
 
-    # --- 2. CARREGAR OS DADOS DE ORDENADORES E EXCEÇÕES ---
-    cargos_excecao, areas_excecao_contem = carregar_excecoes_poder_decisorio()
+    # --- 2. CARREGAR AS CONFIGURAÇÕES GERAIS ---
+    config_data = config_manager.ler_config()
+    cargos_excecao = config_data['CARGO_EXATO']
+    areas_excecao_contem = config_data['AREA_CONTEM']
+    dic_tipos = config_data['TIPOS_CARGO']
+    dic_macroareas = config_data['MACRO_AREAS']
     
     verificar_ordenadores = messagebox.askyesno(
         "Ordenadores de Despesa", 
@@ -206,6 +137,29 @@ def atualizar_planilha_mfe(dados_sici):
                 messagebox.showerror("Erro", f"Falha ao processar arquivo de ordenadores:\n{e}")
                 verificar_ordenadores = False
 
+    calcular_tercis = messagebox.askyesno(
+        "Magnitude do Orçamento", 
+        "Deseja calcular o Critério de Magnitude do Orçamento (Tercis)? (Será necessário fornecer a base de empenhos)"
+    )
+    
+    df_tercis = None
+    if calcular_tercis:
+        messagebox.showinfo("Selecione um arquivo", "Selecione a planilha de Valor Empenhado.")
+        planilha_empenhos = filedialog.askopenfilename(
+            title="Selecione a base de Empenhos",
+            filetypes=[("Arquivos Excel/CSV", "*.xlsx *.xls *.csv"), ("Todos os Arquivos", "*.*")]
+        )
+        if not planilha_empenhos:
+            messagebox.showwarning("Aviso", "Arquivo não selecionado. O cálculo será pulado.")
+            calcular_tercis = False
+        else:
+            try:
+                df_tercis = calculadora_tercis.gerar_dataframe_empenhos(planilha_empenhos)
+                print("[*] Base de Empenhos processada com sucesso.")
+            except Exception as e:
+                messagebox.showerror("Erro", f"Falha ao processar arquivo de empenhos:\n{e}")
+                calcular_tercis = False
+
     # --- 3. MACHINE LEARNING (Predição em Lote) ---
     print("[*] Acionando a Inteligência Artificial para as Áreas de Negócio...")
     areas_unicas_originais = df_sici['área'].fillna("").unique().tolist()
@@ -218,6 +172,10 @@ def atualizar_planilha_mfe(dados_sici):
     sici_keys = {}
     lixos = {'vago', 'vaga', 'nao informado', 'sem titular', '-'}
     
+    dic_tercis = {}
+    if calcular_tercis and df_tercis is not None:
+        dic_tercis = dict(zip(df_tercis['Assinatura_Norm'], df_tercis['Texto_Final_Tercis']))
+        
     for _, rs in df_sici.iterrows():
         org_original = str(rs.get('órgão', ''))
         org = normalizar(org_original)
@@ -254,11 +212,18 @@ def atualizar_planilha_mfe(dados_sici):
         else:
             texto_poder_decisao = "1 - Não possui poder de decisão sobre alocação de recursos orçamentários no órgão"
 
-        tipo_cargo_classificado = DIC_TIPOS.get(cargo, "")
-        macro_area_classificada = DIC_MACROAREA.get(org, "")
+        tipo_cargo_classificado = dic_tipos.get(cargo, "")
+        macro_area_classificada = dic_macroareas.get(org, "")
         
         # Resgata a área classificada pela IA no Dicionário
         area_negocio_classificada = dic_ml_areas.get(area_original, "")
+
+        texto_tercis = ""
+        if calcular_tercis:
+            if titular_norm and titular_norm not in lixos:
+                texto_tercis = dic_tercis.get(titular_norm, "1 - Não ordena despesa | 0 empenho(s)")
+            else:
+                texto_tercis = "1 - Não ordena despesa | 0 empenho(s)"
 
         sici_keys[chave_si] = {
             "orgao": org_original,
@@ -270,7 +235,8 @@ def atualizar_planilha_mfe(dados_sici):
             "texto_poder_decisao": texto_poder_decisao,
             "tipo_cargo": tipo_cargo_classificado,
             "macro_area": macro_area_classificada,
-            "area_negocio": area_negocio_classificada 
+            "area_negocio": area_negocio_classificada,
+            "texto_tercis": texto_tercis
         }
 
     # --- 5. PREPARAR DADOS PARA A PLANILHA NOVA ---
@@ -285,7 +251,10 @@ def atualizar_planilha_mfe(dados_sici):
         nova_linha[5] = dados_si['tipo_cargo']            # Coluna F 
         nova_linha[6] = dados_si['area_negocio']         # Coluna G (ML)
         nova_linha[7] = dados_si['macro_area']            # Coluna H 
+        if dados_si['tipo_cargo']:
+            nova_linha[8] = "1 - Não" if dados_si['tipo_cargo'] == "Ouvidor(a)" else "2 - Sim" # Coluna I
         nova_linha[9] = dados_si['texto_ordenador']       # Coluna J
+        nova_linha[10] = dados_si.get('texto_tercis', '')  # Coluna K
         nova_linha[11] = dados_si['texto_poder_decisao']  # Coluna L
         nova_linha[12] = dados_si['titular']              # Coluna M 
         
@@ -316,6 +285,8 @@ def atualizar_planilha_mfe(dados_sici):
                         # Pinta a Coluna 7 (G) de Amarelo se o ML der alerta em novos registros
                         if col_idx == 7 and str(valor).startswith("⚠️"):
                             cel_add.fill = PatternFill(start_color=COR_ALERTA, end_color=COR_ALERTA, fill_type="solid")
+                        elif col_idx == 9 and str(valor) == "1 - Não":
+                            cel_add.fill = PatternFill(start_color=COR_ALERTA, end_color=COR_ALERTA, fill_type="solid")
                             
                 linha_alvo += 1
 
@@ -334,6 +305,8 @@ def atualizar_planilha_mfe(dados_sici):
     
     if verificar_ordenadores:
         mensagem_resumo += f"\n⚙️ As colunas J e L foram validadas conforme a capacidade de alocar/gerir despesas para cada titular."
+    if calcular_tercis:
+        mensagem_resumo += f"\n⚙️ A coluna K foi preenchida com a Magnitude do Orçamento (Tercis)."
 
     messagebox.showinfo("Atualização Concluída", mensagem_resumo)
 

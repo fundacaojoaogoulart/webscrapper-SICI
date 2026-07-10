@@ -1,12 +1,12 @@
 - machine learning na área de negócio não está preenchendo? (RESOLVIDO)
-- ordena equipe? sim para todos, exceto para todos os ouvidores (marcar para verificação manual)
 - Verificar a função para preenchimento do Tipo de Cargo (FEITO)
 - Parar de verificar mudanças, apenas assumir o sici como o que está certo (FEITO)
 - Parar de pedir uma planilha do MFE, apenas usar uma planilha base para o cabeçalho formatação (FEITO)
-- implementar o botão do matheus no fluxo principal do atualizador
-- Criar um config para a área macro temática
-- Criar um config para do nome do cargo para o tipo do cargo (existe a planilha dicionarios, converter em txt de config)
-- fazer um de-para Tipo de Cargo
+- ordena equipe? sim para todos, exceto para todos os ouvidores (FEITO)
+- fazer um de-para Tipo de Cargo (FEITO)
+- Criar um config para do nome do cargo para o tipo do cargo (existe a planilha dicionarios, converter em txt de config) (FEITO)
+- Criar um config para a área macro temática (FEITO)
+- implementar o botão do matheus no fluxo principal do atualizador (FEITO)
 - Melhorar a planilha de cruzamento PLC, deixar mais enxuta
 - Planilha de cruzamento deve mostrar só os líderes em funções estratégicas
 

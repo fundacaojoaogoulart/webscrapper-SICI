@@ -1,1 +1,12 @@
-pyinstaller --clean --onedir --windowed --collect-all selenium --collect-all sklearn --add-data "model_fjg.pkl;." --add-data "vectorizer_fjg.pkl;." --icon=icon.ico painel_principal.py
+# ==========================================
+# COMANDO PARA GERAR O EXECUTÁVEL RÁPIDO
+# ==========================================
+# Utilizamos a flag --onedir para garantir que o executável abra instantaneamente.
+# Modelos de Machine Learning e o ícone já estão encapsulados.
+#
+# NOTA: O config.txt e a pasta 'planilhas' devem ficar do lado de fora da 
+# pasta final (ou junto do .exe gerado) para que o usuário final 
+# consiga editá-los sem precisar recompilar o código! O próprio robô
+# criará o config.txt automaticamente se ele não existir na pasta.
+
+pyinstaller --clean --onedir --windowed --noconfirm --collect-all selenium --collect-all sklearn --add-data "model_fjg.pkl;." --add-data "vectorizer_fjg.pkl;." --icon=icon.ico painel_principal.py

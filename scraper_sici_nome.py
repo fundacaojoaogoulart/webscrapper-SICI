@@ -10,6 +10,7 @@ import tkinter as tk
 from tkinter import messagebox
 import os
 import atualizador_MFE
+import config_manager
 
 # 🔥 CONFIGURAÇÃO DO FILTRO 
 # PALAVRAS_IGNORADAS = [
@@ -24,42 +25,6 @@ import atualizador_MFE
 #     "vila olímpica", "casa viva", "centro esportivo", "junta especial",
 #     "juntas", "museu histórico"
 # ]
-
-# ---------------- CONFIGURAÇÃO DINÂMICA (config.txt) ----------------
-
-CONFIG_FILE = "config.txt"
-DEFAULT_WORDS = [
-    "escola ", "ciep", "creche", "centro de educação de jovens e adultos",
-    "edi ", "c.m.", "e.m.", "espaço de desenvolvimento infantil",
-    "biblioteca escolar", "centro de desenvolvimento de educação integrada",
-    "hospital", "gerência do parque", "centro de referência de assistência social",
-    "centro de referência da assistência social", "centro de referência especializado de assistência social",
-    "centro de referência especializado da assistência social", "centro municipal de referência",
-    "fundo municipal", "unidade municipal de reinserção", "central de recepção",
-    "centro de cidadania", "conselho", "comitê", "fundo", "comissão",
-    "vila olímpica", "casa viva", "centro esportivo", "junta especial",
-    "juntas", "museu histórico", "secretaria executiva da câmara"
-]
-
-def carregar_palavras_ignoradas():
-    """Lê o config.txt. Se não existir, cria um novo com as palavras padrão."""
-    if not os.path.exists(CONFIG_FILE):
-        with open(CONFIG_FILE, "w", encoding="utf-8") as f:
-            f.write("# Adicione abaixo as palavras ou siglas que o robô deve ignorar.\n")
-            f.write("# Coloque apenas uma palavra por linha. Maiúsculas/minúsculas não importam.\n")
-            f.write("# Linhas que começam com '#' são consideradas comentários.\n\n")
-            for word in DEFAULT_WORDS:
-                f.write(word + "\n")
-        return DEFAULT_WORDS
-    
-    with open(CONFIG_FILE, "r", encoding="utf-8") as f:
-        palavras = []
-        for linha in f:
-            linha_limpa = linha.strip().lower()
-            # Ignora linhas em branco e comentários
-            if linha_limpa and not linha_limpa.startswith("#"):
-                palavras.append(linha_limpa)
-        return palavras
 
 
 # ---------------- FUNÇÕES UTILITÁRIAS ----------------
@@ -86,7 +51,8 @@ def iniciar_raspagem():
     """
 
     # 🔥 CARREGA O ARQUIVO CONFIG.TXT SEMPRE QUE O ROBO INICIAR
-    palavras_ignoradas = carregar_palavras_ignoradas()
+    config_data = config_manager.ler_config()
+    palavras_ignoradas = config_data['PALAVRAS_IGNORADAS']
     
     # 🔥 FUNÇÃO MOVIDA PARA DENTRO PARA LER A VARIÁVEL ATUALIZADA
     def deve_ignorar(texto_orgao):

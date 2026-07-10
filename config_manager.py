@@ -1,4 +1,10 @@
-# =========================================================================
+import os
+import re
+import unicodedata
+
+CONFIG_FILE = "config.txt"
+
+CONFIG_DEFAULT = """# =========================================================================
 # CONFIGURAÇÕES GERAIS DO ROBÔ SICI E ATUALIZADOR MFE
 # =========================================================================
 #
@@ -170,3 +176,65 @@ smtr = Planejamento Urbano e Econômico
 smturrio = Planejamento Urbano e Econômico
 spmrio = Social
 smf = Gestão
+"""
+
+def garantir_config_existe():
+    """Garante que o arquivo config.txt exista, criando-o com os padrões se necessário."""
+    if not os.path.exists(CONFIG_FILE):
+        with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
+            f.write(CONFIG_DEFAULT)
+
+def normalizar(texto):
+    import pandas as pd
+    if pd.isna(texto) or not str(texto).strip(): 
+        return ""
+    texto = str(texto).lower()
+    texto = "".join(c for c in unicodedata.normalize('NFD', texto) if unicodedata.category(c) != 'Mn')
+    texto = re.sub(r'[^a-z0-9]', '', texto)
+    return texto.strip()
+
+def ler_config():
+    """Lê o config.txt e retorna os dicionários e listas organizados."""
+    garantir_config_existe()
+    
+    config_data = {
+        'PALAVRAS_IGNORADAS': [],
+        'CARGO_EXATO': set(),
+        'AREA_CONTEM': [],
+        'TIPOS_CARGO': {},
+        'MACRO_AREAS': {}
+    }
+    
+    secao_atual = None
+    
+    with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
+        for linha in f:
+            linha = linha.strip()
+            
+            if not linha or linha.startswith("#"):
+                continue
+                
+            if linha.startswith("[") and linha.endswith("]"):
+                secao_atual = linha[1:-1]
+                continue
+                
+            if secao_atual == 'PALAVRAS_IGNORADAS':
+                config_data['PALAVRAS_IGNORADAS'].append(linha.lower())
+                
+            elif secao_atual == 'CARGO_EXATO':
+                config_data['CARGO_EXATO'].add(normalizar(linha))
+                
+            elif secao_atual == 'AREA_CONTEM':
+                config_data['AREA_CONTEM'].append(normalizar(linha))
+                
+            elif secao_atual == 'TIPOS_CARGO':
+                if "=" in linha:
+                    cargo, tipo = linha.split("=", 1)
+                    config_data['TIPOS_CARGO'][normalizar(cargo)] = tipo.strip()
+                    
+            elif secao_atual == 'MACRO_AREAS':
+                if "=" in linha:
+                    orgao, macroarea = linha.split("=", 1)
+                    config_data['MACRO_AREAS'][normalizar(orgao)] = macroarea.strip()
+                    
+    return config_data
