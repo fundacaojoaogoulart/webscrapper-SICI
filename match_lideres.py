@@ -145,6 +145,14 @@ def cruzar_planilhas(dados_sici,tarefa = ""):
         'cargo': 'CARGO'
     })
 
+    total_lideres = len(df_a)
+    
+    # Manter apenas líderes em funções estratégicas
+    if tarefa == "PLC":
+        df_c = df_c[df_c['STATUS'] == "Líder em Função Estratégica, nos critérios do MFE"]
+    elif tarefa == "PRLF":
+        df_c = df_c[df_c['STATUS'] == "Liderança feminina em Função Estratégica, nos critérios do MFE"]
+
     print(f"[*] Salvando o resultado final em '{ARQUIVO_C}'...")
     try:
         df_c.to_excel(ARQUIVO_C, index=False)
@@ -156,13 +164,9 @@ def cruzar_planilhas(dados_sici,tarefa = ""):
         messagebox.showerror("Erro Crítico", f"Falha ao salvar a planilha:\n{e}")
         return False
     
-    total_lideres = len(df_c)
-    if tarefa == "PLC":
-        total_comissionados = len(df_c[df_c['STATUS'] == "Líder em Função Estratégica, nos critérios do MFE"]) 
-    elif tarefa == "PRLF":
-        total_comissionados = len(df_c[df_c['STATUS'] == "Liderança feminina em Função Estratégica, nos critérios do MFE"])
+    total_comissionados = len(df_c)
     
-    resumo_msg = f"✅ Cruzamento Concluído!\n\nTotal de líderes validados: {total_lideres}\nEncontrados em cargos comissionados: {total_comissionados}\n\nArquivo '{ARQUIVO_C}' salvo com sucesso!"
+    resumo_msg = f"✅ Cruzamento Concluído!\n\nTotal de líderes analisados: {total_lideres}\nEncontrados em cargos estratégicos: {total_comissionados}\n\nArquivo '{ARQUIVO_C}' salvo com sucesso (contendo apenas os encontrados)!"
     
     messagebox.showinfo("Match concluído!", resumo_msg)
     print(f"\n✅ Concluído!")

@@ -52,7 +52,7 @@ juntas
 museu histórico
 
 [CARGO_EXATO]
-# Define regras extras para a coluna de Poder de Decisão (Coluna L) baseadas no cargo EXATO.
+# Define regras extras para a coluna de Poder de Decisão (Coluna L) baseadas no cargo EXATO (Coluna E).
 # Coloque um cargo por linha.
 Chefe de Gabinete
 Procurador Geral do Município
@@ -71,7 +71,7 @@ Subcontrolador
 Coordenadoria Regional de Educação
 
 [TIPOS_CARGO]
-# Dicionário de Tipos de Cargo: "Nome do Cargo = Tipo de Cargo"
+# Dicionário de Tipos de Cargo: "Nome do Cargo (Coluna E) = Tipo de Cargo (Coluna F)"
 Assessor Chefe = Assessor(a)
 Assessor Chefe Especial = Assessor(a)
 Assessor Chefe Especial I = Assessor(a)
@@ -132,7 +132,7 @@ Superintendente Executivo = Superintendente
 Superintendente Técnico = Superintendente
 
 [MACRO_AREAS]
-# Dicionário de Macro Áreas: "Órgão = Macro Área"
+# Dicionário de Macro Áreas: "Órgão = Macro Área (COLUNA H)"
 casacivil = Gestão
 cgm = Gestão
 cgmrio = Gestão
