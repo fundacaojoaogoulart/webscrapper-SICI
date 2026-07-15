@@ -8,6 +8,9 @@ import scraper_sici_nome
 import atualizador_MFE
 import match_lideres
 
+# Garante que o config.txt seja criado ao lado do executável na primeira inicialização
+config_manager.garantir_config_existe()
+
 def executar_raspagem_completa():
     """Roda a raspagem (O próprio scraper vai perguntar os próximos passos no final)"""
     def tarefa():

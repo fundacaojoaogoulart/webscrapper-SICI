@@ -325,7 +325,14 @@ def iniciar_raspagem():
             df = pd.DataFrame(resultados)
             df["data_extracao"] = data_extracao_str
             
-            nome_arquivo = f"sici_extracao_{nome_arquivo_data}.xlsx"
+            import sys
+            if getattr(sys, 'frozen', False):
+                app_path = os.path.dirname(sys.executable)
+            else:
+                app_path = os.path.dirname(os.path.abspath(__file__))
+            
+            nome_arquivo_base = f"sici_extracao_{nome_arquivo_data}.xlsx"
+            nome_arquivo = os.path.join(app_path, nome_arquivo_base)
             df.to_excel(nome_arquivo, index=False)
             
             msg_sucesso = f"✅ Raspagem do SICI concluída com sucesso!\n\nArquivo gerado: {nome_arquivo}\nTotal de registros extraídos: {len(resultados)}\nTempo de execução: {tempo_formatado}\nClique em OK para iniciar a conferência e atualização da planilha MFE."

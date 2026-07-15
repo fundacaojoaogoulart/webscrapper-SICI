@@ -1,8 +1,14 @@
 import os
+import sys
 import re
 import unicodedata
 
-CONFIG_FILE = "config.txt"
+if getattr(sys, 'frozen', False):
+    app_path = os.path.dirname(sys.executable)
+else:
+    app_path = os.path.dirname(os.path.abspath(__file__))
+
+CONFIG_FILE = os.path.join(app_path, "config.txt")
 
 CONFIG_DEFAULT = """# =========================================================================
 # CONFIGURAÇÕES GERAIS DO ROBÔ SICI E ATUALIZADOR MFE

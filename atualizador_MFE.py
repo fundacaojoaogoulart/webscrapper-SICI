@@ -5,6 +5,8 @@ import unicodedata
 import re
 import datetime
 import os
+import sys
+import shutil
 import tkinter as tk
 from tkinter import filedialog
 from tkinter import messagebox
@@ -60,9 +62,46 @@ def selecionar_arquivo_sici_interface():
 def atualizar_planilha_mfe(dados_sici):
     
     root = inicializar_tkinter()
-    arquivo_base = "MFE_Base.xlsx"
-    arquivo_saida = "MFE_Atualizada.xlsx"
     
+    if getattr(sys, 'frozen', False):
+        app_path = os.path.dirname(sys.executable)
+    else:
+        app_path = os.path.dirname(os.path.abspath(__file__))
+        
+    arquivo_base = os.path.join(app_path, "MFE_Base.xlsx")
+    arquivo_saida = os.path.join(app_path, "MFE_Atualizada.xlsx")
+    
+    if not os.path.exists(arquivo_base):
+        try:
+            log_path = os.path.join(app_path, "debug.txt")
+            with open(log_path, "a", encoding="utf-8") as logf:
+                logf.write(f"\\n[{datetime.datetime.now()}] Iniciando extração.\\n")
+                logf.write(f"app_path: {app_path}\\n")
+                
+                caminho_interno = os.path.join(app_path, "_internal", "MFE_Base.xlsx")
+                logf.write(f"caminho_interno: {caminho_interno}\\n")
+                
+                if not os.path.exists(caminho_interno) and hasattr(sys, '_MEIPASS'):
+                    caminho_interno = os.path.join(sys._MEIPASS, "MFE_Base.xlsx")
+                    logf.write(f"caminho_interno MEIPASS: {caminho_interno}\\n")
+                    
+                existe_interno = os.path.exists(caminho_interno)
+                logf.write(f"Existe interno? {existe_interno}\\n")
+                
+                if existe_interno:
+                    # Copiando em modo binário puro para evitar bloqueios de metadados do Windows
+                    with open(caminho_interno, 'rb') as src, open(arquivo_base, 'wb') as dst:
+                        dst.write(src.read())
+                    logf.write(f"Cópia executada com SUCESSO para: {arquivo_base}\\n")
+                
+                existe_base = os.path.exists(arquivo_base)
+                logf.write(f"Existe base após cópia? {existe_base}\\n")
+                
+        except Exception as e:
+            with open(os.path.join(app_path, "debug.txt"), "a", encoding="utf-8") as logf:
+                logf.write(f"EXCECAO FATAL NA COPIA: {str(e)}\\n")
+            messagebox.showerror("Erro de Extração", f"Falha ao extrair a planilha base:\\nErro: {str(e)}")
+
     if not os.path.exists(arquivo_base):
         print(f"[ALERTA] Planilha base '{arquivo_base}' não encontrada.")
         messagebox.showwarning("Aviso", f"Planilha base '{arquivo_base}' não encontrada no diretório atual. Operação cancelada.")

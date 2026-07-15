@@ -7,7 +7,14 @@ from tkinter import messagebox
 import os
 
 # ---------------- CONFIGURAÇÕES ----------------
-ARQUIVO_C = "planilha_cruzamento.xlsx"
+import sys
+
+if getattr(sys, 'frozen', False):
+    app_path = os.path.dirname(sys.executable)
+else:
+    app_path = os.path.dirname(os.path.abspath(__file__))
+
+ARQUIVO_C = os.path.join(app_path, "planilha_cruzamento.xlsx")
 
 # ---------------- UTILITÁRIOS ----------------
 def normalizar_nome(texto):
