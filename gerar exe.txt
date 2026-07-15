@@ -9,4 +9,4 @@
 # consiga editá-los sem precisar recompilar o código! O próprio robô
 # criará o config.txt automaticamente se ele não existir na pasta.
 
-pyinstaller --clean --onedir --windowed --noconfirm --collect-all selenium --collect-all sklearn --add-data "model_fjg.pkl;." --add-data "vectorizer_fjg.pkl;." --add-data "MFE_Base.xlsx;." --icon=icon.ico painel_principal.py
+pyinstaller --clean --onedir --windowed --noconfirm --collect-all selenium --collect-all sklearn --add-data "model_fjg.pkl;." --add-data "vectorizer_fjg.pkl;." --add-data "MFE_Base.xlsx;." --add-data "config.txt;." --icon=icon.ico painel_principal.py

@@ -8,12 +8,17 @@ Este projeto é um conjunto de ferramentas de Web Scraping e Processamento de Da
 
 ## 🏗️ Visão Geral e Orquestração
 
-O coração do projeto é o script **`painel_principal_com_nomes.py`**. Ele atua como o **Orquestrador Central** da aplicação, fornecendo uma Interface Gráfica (GUI) amigável (via Tkinter) para que o usuário interaja com os módulos subjacentes sem precisar executar linhas de código no terminal. 
+O coração do projeto é o script **`painel_principal.py`**. Ele atua como o **Orquestrador Central** da aplicação, fornecendo uma Interface Gráfica (GUI) amigável (via Tkinter) para que o usuário interaja com os módulos subjacentes sem precisar executar linhas de código no terminal. 
 
-O painel centraliza o acesso a três rotinas principais:
+O painel centraliza o acesso a rotinas principais e orquestra scripts secundários:
 1. **Raspagem Web (`scraper_sici_nome.py`):** Navegação automatizada no site do SICI para extrair a árvore de cargos atualizada.
 2. **Atualização do MFE (`atualizador_MFE.py`):** Injeção estrutural de adições, exclusões e regras de negócio na planilha do Mapeamento de Funções Estratégicas.
-3. **Validação de Líderes (`match_lideres.py`):** Cruzamento de bases para identificar quais integrantes da Rede de Líderes Cariocas estão ocupando cargos estratégicos comissionados, segundo critérios do MFE.
+3. **Validação de Líderes e Liderança Feminina (`match_lideres.py`):** Cruzamento de bases para identificar quais integrantes da Rede de Líderes Cariocas ou Liderança Feminina estão ocupando cargos estratégicos comissionados, segundo critérios do MFE.
+
+Além dos módulos principais, o sistema orquestra nativamente os seguintes scripts e dependências internas:
+- **`calculadora_tercis.py`**: Auxilia a atualização do MFE, processando planilhas financeiras (empenhos) para calcular o poder de decisão sobre orçamento.
+- **`area_negocio_ml.py`**: Módulo de Machine Learning que consome os modelos treinados **`model_fjg.pkl`** e **`vectorizer_fjg.pkl`** para classificar e prever automaticamente a área de negócio dos cargos da prefeitura.
+- **`config_manager.py`**: Script centralizado para ler, criar e gerenciar o arquivo `config.txt`.
 
 ---
 
@@ -21,7 +26,7 @@ O painel centraliza o acesso a três rotinas principais:
 
 Utilize o comando abaixo para gerar uma nova versão do webscraper do sici
 ```bash
-pyinstaller --clean --onedir --windowed --collect-all selenium --collect-all sklearn --add-data "model_fjg.pkl;." --add-data "vectorizer_fjg.pkl;." --add-data "MFE_Base.xlsx;." --icon=icon.ico painel_principal_com_nomes.py
+pyinstaller --clean --onedir --windowed --noconfirm --collect-all selenium --collect-all sklearn --add-data "model_fjg.pkl;." --add-data "vectorizer_fjg.pkl;." --add-data "MFE_Base.xlsx;." --add-data "config.txt;." --icon=icon.ico painel_principal.py
 ```
 
 
@@ -40,8 +45,9 @@ O fluxo ideal de ponta a ponta projetado pela automação funciona da seguinte m
 
 - **1. Iniciar Raspagem Web (SICI):** Executa o fluxo completo. Abre o navegador, realiza o web scraping no SICI, gera o arquivo Excel bruto com nomes dos titulares e encadeia (via pop-ups) as atualizações subsequentes.
 - **2. Somente Atualizar MFE:** Rotina offline. Permite ao usuário pular a etapa do navegador e usar uma planilha do SICI já extraída anteriormente no seu computador para atualizar a planilha do MFE.
-- **3. Somente Contabilizar Líderes Cariocas (Minibios):** Rotina offline. Cruza uma base do SICI já existente com uma planilha com nomes (exemplo: Minibios) para checar o *status* de comissionamento das lideranças.
-- **4. Editar Filtro de Palavras Ignoradas:** Abre o bloco de notas de configuração (`config.txt`) permitindo adicionar ou remover siglas/palavras que o robô deve ignorar na hora de varrer o SICI e outras configurações de preenchimento do atualizador do MFE.
+- **3. Somente Contabilizar Líderes Cariocas (Minibios):** Rotina offline. Cruza uma base do SICI já existente com uma planilha com nomes (exemplo: Minibios) para checar o *status* de comissionamento das lideranças (Líderes Cariocas).
+- **4. Somente Contabilizar Liderança Feminina:** Rotina offline. Semelhante à validação de Líderes Cariocas, mas cruza a base com a planilha com a listagem de integrantes do Programa de Liderança Feminina.
+- **5. Editar Configurações Gerais (config.txt):** Abre o bloco de notas de configuração (`config.txt`) permitindo adicionar ou remover siglas/palavras que o robô deve ignorar na hora de varrer o SICI e outras configurações de preenchimento do atualizador do MFE.
 
 ---
 
@@ -90,4 +96,14 @@ A automação não sobrescreve os dados de maneira opaca. Toda execução gera r
 
 1. **`sici_extracao_completa_YYYYMMDD_HHMM.xlsx`:** O "banco de dados" puro e bruto raspado do portal SICI, servindo como fonte de verdade para o dia da execução.
 2. **`MFE_Atualizada`:** É gerada uma planilha MFE Atualizada com os dados extraídos do SICI, usando uma planilha MFE_Base como referência de cabeçalhos.
-4. **`planilha_cruzamento_PLC/PRLF.xlsx`:** Arquivo final resultante do script de líderes cariocas/liderança feminina, adicionando as colunas `status`, `área` e `cargo` aos dados originais do Minibios.
+3. **`planilha_cruzamento_PLC/PRLF.xlsx`:** Arquivo final resultante do script de líderes cariocas/liderança feminina, adicionando as colunas `status`, `área` e `cargo` aos dados originais do Minibios.
+
+---
+
+## 📦 Bibliotecas e Dependências Externas (Python)
+
+O projeto requer diversas bibliotecas Python, que estão detalhadas no arquivo `requirements.txt`. Dentre as principais:
+- **`pandas`** e **`numpy`**: Usadas de forma pesada em todos os scripts para cruzamento de dados e cálculos vetorizados.
+- **`selenium`**: Motor do web scraping que automatiza o navegador no script `scraper_sici_nome.py`.
+- **`openpyxl`**: Utilizada no `atualizador_MFE.py` para injeção de dados formatados sem quebrar a estrutura (cores e layouts) da planilha original do Excel.
+- **`scikit-learn` (`sklearn`)**: Motor de predição utilizado no `area_negocio_ml.py` em conjunto com os arquivos pickle (`.pkl`).
