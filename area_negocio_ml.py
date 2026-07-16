@@ -23,15 +23,32 @@ def obter_caminho(nome_arquivo):
     """
     Retorna o caminho absoluto do arquivo. 
     Funciona tanto rodando o .py normal quanto rodando o .exe compilado.
+    Procura tanto na pasta temporária (se embutido) quanto ao lado do .exe.
     """
-    try:
-        # Se for um .exe gerado pelo PyInstaller, os arquivos estarão nesta pasta temporária
-        base_path = sys._MEIPASS
-    except Exception:
-        # Se estiver rodando o script .py direto no editor, pega a pasta local
-        base_path = os.path.abspath(".")
+    caminhos_tentativas = []
+    
+    if getattr(sys, 'frozen', False):
+        # Se for um .exe gerado pelo PyInstaller
+        # 1. Pasta temporária do PyInstaller (caso o arquivo tenha sido embutido no exe)
+        if hasattr(sys, '_MEIPASS'):
+            caminhos_tentativas.append(sys._MEIPASS)
+        # 2. Pasta onde o arquivo .exe está localizado (caso o arquivo esteja solto ao lado)
+        caminhos_tentativas.append(os.path.dirname(sys.executable))
+    else:
+        # Se estiver rodando o script .py direto no editor (VSCode)
+        caminhos_tentativas.append(os.path.dirname(os.path.abspath(__file__)))
+        caminhos_tentativas.append(os.path.abspath("."))
 
-    return os.path.join(base_path, nome_arquivo)
+    # Retorna o primeiro caminho onde o arquivo de fato existe
+    for base_path in caminhos_tentativas:
+        caminho_completo = os.path.join(base_path, nome_arquivo)
+        if os.path.exists(caminho_completo):
+            return caminho_completo
+            
+    # Se não encontrar em nenhum lugar, retorna o caminho base padrão para estourar o erro previsto
+    if caminhos_tentativas:
+        return os.path.join(caminhos_tentativas[-1], nome_arquivo)
+    return nome_arquivo
 
 def _carregar_modelos():
     """Garante que os arquivos .pkl sejam carregados na memória de forma otimizada."""
