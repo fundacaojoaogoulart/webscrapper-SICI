@@ -1,0 +1,86 @@
+{
+  "area_negocio_ml.py": {
+    "mtime": 1790081354.587931,
+    "seen": 1790086391.5154326,
+    "ast_hash": "514188931fea1591145b3acbbca32e23",
+    "semantic_hash": "514188931fea1591145b3acbbca32e23"
+  },
+  "atualizador_MFE.py": {
+    "mtime": 1790081354.587931,
+    "seen": 1790086391.5154376,
+    "ast_hash": "1dfabf02ea1ab23c5866408140e6a072",
+    "semantic_hash": "1dfabf02ea1ab23c5866408140e6a072"
+  },
+  "calculadora_tercis.py": {
+    "mtime": 1790081354.602838,
+    "seen": 1790086391.5154395,
+    "ast_hash": "9c518f149d31600a575004ae915485ee",
+    "semantic_hash": "9c518f149d31600a575004ae915485ee"
+  },
+  "config_manager.py": {
+    "mtime": 1790081354.602838,
+    "seen": 1790086391.5154407,
+    "ast_hash": "01660c4eb534aa8e437335f4678b8797",
+    "semantic_hash": "01660c4eb534aa8e437335f4678b8797"
+  },
+  "gestores_equipes.py": {
+    "mtime": 1790081354.6194222,
+    "seen": 1790086391.5154417,
+    "ast_hash": "b5a786ff2d8231c3efb561650e971e2d",
+    "semantic_hash": "b5a786ff2d8231c3efb561650e971e2d"
+  },
+  "match_lideres.py": {
+    "mtime": 1790081354.6194222,
+    "seen": 1790086391.5154426,
+    "ast_hash": "936879c1e8bb361873ae6068cb79e393",
+    "semantic_hash": "936879c1e8bb361873ae6068cb79e393"
+  },
+  "painel_principal.py": {
+    "mtime": 1790081354.669406,
+    "seen": 1790086391.5154438,
+    "ast_hash": "243441ee721a0b0f2a8dd2465b992961",
+    "semantic_hash": "243441ee721a0b0f2a8dd2465b992961"
+  },
+  "scraper_sici_nome.py": {
+    "mtime": 1790081354.7028463,
+    "seen": 1790086391.5154445,
+    "ast_hash": "465ca971efb43ba72ea59ec8ca86876d",
+    "semantic_hash": "465ca971efb43ba72ea59ec8ca86876d"
+  },
+  "Rascunhos acerca da automatizacao.md": {
+    "mtime": 1790081354.5413835,
+    "seen": 1790086391.5154452,
+    "ast_hash": "a62ecd721a81f08ce8545f90c1b2c225",
+    "semantic_hash": "a62ecd721a81f08ce8545f90c1b2c225"
+  },
+  "config.txt": {
+    "mtime": 1790081354.602838,
+    "seen": 1790086391.515446,
+    "ast_hash": "5fcb3b1ba59c644a3ea17903a73c0071",
+    "semantic_hash": "5fcb3b1ba59c644a3ea17903a73c0071"
+  },
+  "gerar exe.txt": {
+    "mtime": 1790081354.6194222,
+    "seen": 1790086391.5154471,
+    "ast_hash": "7b59594b6e4db4e8b6cf452a7a187974",
+    "semantic_hash": "7b59594b6e4db4e8b6cf452a7a187974"
+  },
+  "readme.md": {
+    "mtime": 1790081354.7028463,
+    "seen": 1790086391.5154483,
+    "ast_hash": "93c18d3a91d18eac750433c2b479c9e3",
+    "semantic_hash": "93c18d3a91d18eac750433c2b479c9e3"
+  },
+  "requirements.txt": {
+    "mtime": 1790081354.7028463,
+    "seen": 1790086391.515449,
+    "ast_hash": "db9ab01cfc2117e6c38ea978847c776a",
+    "semantic_hash": "db9ab01cfc2117e6c38ea978847c776a"
+  },
+  "webscraper icon-nobg.png": {
+    "mtime": 1790081354.7303882,
+    "seen": 1790086391.5154498,
+    "ast_hash": "b22c0701a631bd64628b7b775c35daa7",
+    "semantic_hash": "b22c0701a631bd64628b7b775c35daa7"
+  }
+}
