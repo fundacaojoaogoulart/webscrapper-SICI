@@ -1,0 +1,68 @@
+name: verify
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  docs-impact:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Determinar referência base
+        id: base
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            base="${{ github.event.pull_request.base.sha }}"
+          else
+            base="${{ github.event.before }}"
+          fi
+          if [ "$base" = "0000000000000000000000000000000000000000" ] || [ -z "$base" ]; then
+            base="HEAD~1"
+          fi
+          echo "base=$base" >> "$GITHUB_OUTPUT"
+
+      - name: Triagem de impacto documental
+        run: python scripts/docs-impact.py --base "${{ steps.base.outputs.base }}" --head "${{ github.sha }}"
+
+      - name: Resumo e sinalização (não bloqueante)
+        if: always()
+        shell: bash
+        run: |
+          if [ -f .docs-impact/impact.json ]; then
+            python - <<'PY'
+            import json
+            d = json.load(open('.docs-impact/impact.json', encoding='utf-8'))
+            print('needsAgent =', d['needsAgent'])
+            print('requiresHumanReview =', d['requiresHumanReview'])
+            print('summary =', d['summary'])
+            for c in d['changes']:
+                if c['classification'] in ('review_ai', 'manual_review'):
+                    print(f"  {c['status']} {c['path']} -> {c['classification']}")
+            if d['needsAgent']:
+                print('::warning::Impacto potencial na documentação. Baixe o artefato docs-impact e execute a atualização manualmente.')
+            PY
+          fi
+
+      - name: Upload do pacote de contexto
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: docs-impact
+          path: .docs-impact/
+          if-no-files-found: ignore

@@ -1,0 +1,9 @@
+# Dependências apenas para gerar a documentação local (MkDocs).
+# Não são necessárias para executar a aplicação SICI.
+
+mkdocs>=1.6
+mkdocs-material>=9.5
+
+# Validação: renderização dos diagramas Mermaid (Selenium) e resumo de schema (.xlsx).
+selenium==4.41.0
+openpyxl==3.1.5

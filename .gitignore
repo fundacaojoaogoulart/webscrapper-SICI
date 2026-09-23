@@ -126,6 +126,7 @@ celerybeat.pid
 
 # Environments
 .env
+.venv-docs
 .venv
 env/
 venv/
@@ -142,6 +143,9 @@ venv.bak/
 
 # mkdocs documentation
 /site
+
+# docs-impact (triagem/contexto de atualização incremental da documentação)
+.docs-impact/
 
 # mypy
 .mypy_cache/

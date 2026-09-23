@@ -1,0 +1,61 @@
+# Configuração do MkDocs para a documentação técnica local.
+# Gere o HTML com:  python -m mkdocs build --strict
+# Sirva localmente com:  python -m mkdocs serve --dev-addr 127.0.0.1:8000
+
+site_name: SICI — Documentação Técnica
+site_description: Auditoria técnica e rastreabilidade de dados do webscraper SICI.
+site_url: ""
+use_directory_urls: true
+
+# Os diagramas HTML do Diagram Design e o gerador (gerar.py) permanecem no
+# repositório, mas ficam fora do build do MkDocs: a documentação os reproduz
+# em Mermaid. Excluir também evita copiar o .py para o site gerado.
+exclude_docs: |
+  diagramas/*
+
+theme:
+  name: material
+  language: pt
+  features:
+    - navigation.sections
+    - navigation.top
+    - search.suggest
+    - search.highlight
+  palette:
+    - scheme: default
+      toggle:
+        icon: material/brightness-7
+        name: Alternar para tema escuro
+    - scheme: slate
+      toggle:
+        icon: material/brightness-4
+        name: Alternar para tema claro
+
+nav:
+  - Início: index.md
+  - Fluxo dos dados: data-lineage.md
+  - Arquitetura: architecture.md
+  - Avaliação técnica: technical-review.md
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_div_format
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - tables
+  - toc:
+      permalink: true
+
+# Mermaid é carregado de arquivos locais (sem CDN) para uso offline/privado.
+extra_javascript:
+  - assets/mermaid.min.js
+  - assets/mermaid-init.js
