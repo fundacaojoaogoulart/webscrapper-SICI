@@ -46,17 +46,17 @@ jobs:
         run: |
           if [ -f .docs-impact/impact.json ]; then
             python - <<'PY'
-            import json
-            d = json.load(open('.docs-impact/impact.json', encoding='utf-8'))
-            print('needsAgent =', d['needsAgent'])
-            print('requiresHumanReview =', d['requiresHumanReview'])
-            print('summary =', d['summary'])
-            for c in d['changes']:
-                if c['classification'] in ('review_ai', 'manual_review'):
-                    print(f"  {c['status']} {c['path']} -> {c['classification']}")
-            if d['needsAgent']:
-                print('::warning::Impacto potencial na documentação. Baixe o artefato docs-impact e execute a atualização manualmente.')
-            PY
+          import json
+          d = json.load(open('.docs-impact/impact.json', encoding='utf-8'))
+          print('needsAgent =', d['needsAgent'])
+          print('requiresHumanReview =', d['requiresHumanReview'])
+          print('summary =', d['summary'])
+          for c in d['changes']:
+              if c['classification'] in ('review_ai', 'manual_review'):
+                  print(f"  {c['status']} {c['path']} -> {c['classification']}")
+          if d['needsAgent']:
+              print('::warning::Impacto potencial na documentação. Baixe o artefato docs-impact e execute a atualização manualmente.')
+          PY
           fi
 
       - name: Upload do pacote de contexto
