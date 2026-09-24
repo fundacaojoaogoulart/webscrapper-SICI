@@ -141,11 +141,9 @@ venv.bak/
 # Rope project settings
 .ropeproject
 
-# mkdocs documentation
-/site
-
-# docs-impact (triagem/contexto de atualização incremental da documentação)
-.docs-impact/
+# documentação MkDocs e contexto local de revisão
+.docs/mkdoc/
+.docs-update/
 
 # mypy
 .mypy_cache/

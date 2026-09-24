@@ -1,54 +1,31 @@
 # Documentação técnica
 
-Auditoria técnica e rastreabilidade de dados do **webscraper SICI** da Prefeitura do Rio. Esta documentação descreve o fluxo dos dados, a arquitetura e uma avaliação técnica da implementação.
+Documentação do **webscraper SICI** da Prefeitura do Rio: uma aplicação desktop em Python que extrai a árvore de cargos do Portal SICI, atualiza o Mapeamento de Funções Estratégicas (MFE) e executa cruzamentos de lideranças.
 
 ## Visão geral
 
-O sistema automatiza a extração da árvore de cargos da Prefeitura do Rio (Portal SICI) e a atualização do Mapeamento de Funções Estratégicas (MFE), além de cruzamentos de lideranças (Líderes Cariocas e Liderança Feminina). É uma aplicação de desktop em Python, com interface gráfica (Tkinter), scraping via Selenium/Chrome e processamento de planilhas via pandas/openpyxl.
+O ponto de entrada é `painel_principal.py`. O usuário inicia uma raspagem web ou seleciona uma extração existente; o processamento interno classifica os dados e escreve arquivos locais. O pacote pode ser distribuído como executável `--onedir` via PyInstaller.
 
-O ponto de entrada é `painel_principal.py`; o pacote pode ser distribuído como executável `--onedir` via PyInstaller.
-
-## Componentes principais
+### Entradas, processamento e saídas
 
 ```mermaid
-flowchart LR
-    subgraph Entrada["Interface e orquestração"]
-        P["painel_principal.py"]
-    end
-    subgraph Raspagem["Scraping"]
-        S["scraper_sici_nome.py"]
-    end
-    subgraph Processamento["Classificação e escrita"]
-        A["atualizador_MFE.py"]
-        ML["area_negocio_ml.py"]
-        T["calculadora_tercis.py"]
-    end
-    subgraph Cruzamentos["Cruzamentos"]
-        L["match_lideres.py"]
-        G["gestores_equipes.py"]
-    end
-    subgraph Config["Configuração"]
-        C["config_manager.py"]
-        CFG["config.txt"]
-    end
-    subgraph Recursos["Recursos"]
-        B["MFE_Base.xlsx"]
-        PK["model_fjg.pkl / vectorizer_fjg.pkl"]
-    end
+flowchart TB
+    sici[Portal SICI]:::external
+    input[(Extração SICI ou arquivo selecionado)]:::data
+    panel[[painel_principal.py]]:::code
+    process[Classificação e cruzamentos]:::task
+    mfe[/MFE_Atualizada.xlsx/]:::document
+    leaders[/Planilhas de cruzamento/]:::document
 
-    P -->|"thread: iniciar_raspagem()"| S
-    P -->|"atualizar_planilha_mfe()"| A
-    P -->|"cruzar_planilhas()"| L
-    S -->|"atualizador_MFE / match_lideres"| A
-    S --> L
-    A --> ML
-    A --> T
-    A --> C
-    S --> C
-    C --> CFG
-    A --> B
-    ML --> PK
-    G -->|"painel independente"| CFG
+    sici --> panel --> input --> process
+    process --> mfe
+    process --> leaders
+
+    classDef data fill:#E3EDFF,stroke:#4A7BE8,color:#173467;
+    classDef document fill:#EAE3FA,stroke:#8760C8,color:#30204E;
+    classDef task fill:#E3EDFF,stroke:#4A7BE8,color:#173467;
+    classDef code fill:#F0EAFE,stroke:#7554B9,color:#30204E;
+    classDef external fill:#FFF7D8,stroke:#C9AC2D,color:#4B3D0C,stroke-dasharray:5 3;
 ```
 
 ## O que você encontra aqui
@@ -57,4 +34,5 @@ flowchart LR
 |---|---|
 | [Fluxo dos dados](data-lineage.md) | Como os dados chegam, são processados e chegam às planilhas? Quais campos são automáticos e quais são manuais? |
 | [Arquitetura](architecture.md) | Quais módulos existem, como se relacionam e como o executável é construído? |
-| [Avaliação técnica](technical-review.md) | Quais problemas, riscos e melhorias a implementação atual apresenta? |
+| [Avaliação técnica](technical-review.md) | Quais problemas, riscos e melhorias a implementação inicial apresenta? |
+| [Manutenção](documentation-maintenance.md) | Como triar, revisar e validar alterações na documentação? |

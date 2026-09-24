@@ -15,13 +15,13 @@ Instruções permanentes para agentes que trabalham neste repositório.
 - Mudança em componentes, responsabilidades, dependências ou no `.exe` → `architecture.md`.
 - Manter a documentação em dia após mudança de código → siga `documentation-maintenance.md`.
 
-## Manutenção incremental (sempre manual)
+## Manutenção incremental
 
-Rode com o Python da `.venv-docs` (`.\.venv-docs\Scripts\python.exe`), que contém MkDocs e Selenium.
+Rode com o Python da `.venv-docs` (`.\.venv-docs\Scripts\python.exe`), que contém MkDocs.
 
-1. `python scripts/docs-impact.py` — triagem determinística (sem IA).
-2. Se `needsAgent: true`, `python scripts/docs-update.py` (aciona `opencode run`).
-3. Valide com `python scripts/docs-validate.py`.
+1. `python scripts/docs-update.py prepare` — triagem determinística (sem IA).
+2. Para `review_ai`, revise somente `.docs-update/review-context.json` com o agente `documentation-engineer`; `manual_review` exige confirmação humana. `python scripts/docs-update.py update` não chama IA.
+3. Valide com `python scripts/docs-update.py validate`.
 
 ## Regras de preservação
 
@@ -32,5 +32,4 @@ Rode com o Python da `.venv-docs` (`.\.venv-docs\Scripts\python.exe`), que cont�
 
 ## Validação
 
-- `python scripts/docs-validate.py`
-- `python scripts/docs-impact.py --test`
+- `python scripts/docs-update.py validate`

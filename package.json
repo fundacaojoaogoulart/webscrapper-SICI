@@ -1,0 +1,5 @@
+{
+  "devDependencies": {
+    "@documentation-engineer/kit": "file:../system-documentation/documentation-engineer-kit-0.1.0-beta.1.tgz"
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "package": "@documentation-engineer/kit",
+  "files": [
+    ".agents/skills/system-documentation/SKILL.md",
+    ".agents/skills/system-documentation/examples/AGENTS-snippet.md",
+    ".agents/skills/system-documentation/examples/prompts.md",
+    ".agents/skills/system-documentation/references/documentation-standards.md",
+    ".agents/skills/system-documentation/references/incremental-update.md",
+    ".agents/skills/system-documentation/references/initial-audit.md",
+    ".agents/skills/system-documentation/references/setup-ci.md",
+    ".agents/skills/system-documentation/scripts/detect_changes.py",
+    ".agents/skills/system-documentation/scripts/test_workflow.py",
+    ".agents/skills/system-documentation/scripts/validate_docs.py",
+    ".agents/skills/system-documentation/templates/diagram-style.md",
+    ".agents/skills/system-documentation/templates/docs-dependencies.example.json",
+    ".agents/skills/system-documentation/templates/docs-update.py",
+    ".agents/skills/system-documentation/templates/documentation-maintenance.template.md",
+    ".agents/skills/system-documentation/templates/documentation.yml",
+    ".agents/skills/system-documentation/templates/extra.css",
+    ".agents/skills/system-documentation/templates/gitignore-docs.snippet",
+    ".agents/skills/system-documentation/templates/mkdocs.yml",
+    ".agents/skills/system-documentation/templates/requirements-docs.txt",
+    ".opencode/agents/documentation-engineer.md"
+  ]
+}

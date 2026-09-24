@@ -1,153 +1,41 @@
 {
-  "$comment": "Mapeamento determinístico entre módulos do código e a documentação. Atualize quando uma fonte, destino de dados, integração ou módulo novo for confirmado. Categorias definidas na Tarefa 2 de manutenção incremental.",
-  "docs": [
-    { "id": "data-lineage", "path": "docs/data-lineage.md", "reviewable": true },
-    { "id": "architecture", "path": "docs/architecture.md", "reviewable": true },
-    { "id": "technical-review", "path": "docs/technical-review.md", "reviewable": false }
-  ],
-  "ignore": [
-    ".git/**",
-    ".gitignore",
-    ".github/**",
-    ".agents/**",
-    "skills-lock.json",
-    "scripts/**",
-    "AGENTS.md",
-    "readme.md",
-    "Rascunhos acerca da automatizacao.md",
-    "docs/**",
-    "__pycache__/**",
-    "*.pyc",
-    "*.pyo",
-    "*.log",
-    "build/**",
-    "dist/**",
-    "*.spec",
-    "*.manifest",
-    "site/**",
-    ".venv/**",
-    ".venv-docs/**",
-    ".docs-impact/**",
-    "graphify-out/**",
-    "*.zip",
-    "*.png",
-    "*.ico",
-    "*.jpg",
-    "*.jpeg",
-    "*.gif",
-    "*.svg",
-    "Planilhas webscraper.zip"
-  ],
-  "regenerate": [
-    "mkdocs.yml",
-    "requirements-docs.txt",
-    "docs/index.md",
-    "docs/assets/**",
-    "docs/diagramas/**"
-  ],
-  "data_artifacts": [
-    "MFE_Atualizada.xlsx",
-    "SICI_Atualizado_com_Tercis.xlsx",
-    "Relatorio_Intermediario_Tercis.xlsx",
-    "planilha_cruzamento_PLC.xlsx"
-  ],
-  "categories": {
-    "scraping_sources": "fontes utilizadas pelo scraping",
-    "selectors": "páginas, seletores e estruturas de extração",
-    "extracted_fields": "campos coletados",
-    "input_schemas": "schemas de entrada",
-    "output_schemas": "schemas de saída",
-    "rules": "regras de correspondência e classificação",
-    "transformations": "transformações e normalizações",
-    "sheets_read_write": "leitura e escrita das planilhas",
-    "exe": "geração e execução do .exe",
-    "architecture_components": "componentes da arquitetura",
-    "architecture_dependencies": "dependências da arquitetura"
-  },
-  "files": [
+  "version": 1,
+  "rules": [
     {
-      "path": "scraper_sici_nome.py",
-      "categories": ["scraping_sources", "selectors", "extracted_fields", "transformations"],
-      "docs": ["data-lineage", "architecture"],
-      "classification": "review_ai"
+      "globs": [".agents/**", ".opencode/**"],
+      "documents": [],
+      "decision": "skip",
+      "reason": "Configuração e kit local do OpenCode não integram o comportamento do aplicativo documentado."
     },
     {
-      "path": "atualizador_MFE.py",
-      "categories": ["rules", "transformations", "sheets_read_write", "output_schemas"],
-      "docs": ["data-lineage"],
-      "classification": "review_ai"
+      "globs": ["scraper_sici_nome.py", "atualizador_MFE.py", "area_negocio_ml.py", "calculadora_tercis.py", "config_manager.py", "config.txt"],
+      "documents": ["docs/data-lineage.md", "docs/architecture.md"],
+      "decision": "review_ai",
+      "reason": "Fontes, extração, regras de classificação, transformações e planilhas do fluxo SICI/MFE."
     },
     {
-      "path": "area_negocio_ml.py",
-      "categories": ["rules", "transformations"],
-      "docs": ["data-lineage"],
-      "classification": "review_ai"
+      "globs": ["match_lideres.py", "gestores_equipes.py"],
+      "documents": ["docs/data-lineage.md", "docs/architecture.md"],
+      "decision": "review_ai",
+      "reason": "Cruzamentos de lideranças e seus arquivos de entrada e saída."
     },
     {
-      "path": "calculadora_tercis.py",
-      "categories": ["rules", "transformations"],
-      "docs": ["data-lineage"],
-      "classification": "review_ai"
+      "globs": ["painel_principal.py", "gerar exe.txt", "requirements.txt"],
+      "documents": ["docs/architecture.md", "docs/data-lineage.md"],
+      "decision": "review_ai",
+      "reason": "Orquestração, distribuição e dependências do aplicativo."
     },
     {
-      "path": "config_manager.py",
-      "categories": ["rules", "transformations"],
-      "docs": ["data-lineage"],
-      "classification": "review_ai"
+      "globs": ["MFE_Base.xlsx", "model_fjg.pkl", "vectorizer_fjg.pkl"],
+      "documents": ["docs/data-lineage.md"],
+      "decision": "manual_review",
+      "reason": "Schemas de planilha e modelos binários exigem confirmação humana antes de documentar comportamento."
     },
     {
-      "path": "config.txt",
-      "categories": ["rules", "transformations"],
-      "docs": ["data-lineage"],
-      "classification": "review_ai"
-    },
-    {
-      "path": "match_lideres.py",
-      "categories": ["sheets_read_write", "output_schemas", "architecture_components"],
-      "docs": ["data-lineage", "architecture"],
-      "classification": "review_ai"
-    },
-    {
-      "path": "gestores_equipes.py",
-      "categories": ["sheets_read_write", "output_schemas", "architecture_components"],
-      "docs": ["data-lineage", "architecture"],
-      "classification": "review_ai"
-    },
-    {
-      "path": "painel_principal.py",
-      "categories": ["architecture_components", "exe"],
-      "docs": ["architecture", "data-lineage"],
-      "classification": "review_ai"
-    },
-    {
-      "path": "gerar exe.txt",
-      "categories": ["exe"],
-      "docs": ["architecture"],
-      "classification": "review_ai"
-    },
-    {
-      "path": "requirements.txt",
-      "categories": ["architecture_dependencies"],
-      "docs": ["architecture"],
-      "classification": "review_ai"
-    },
-    {
-      "path": "MFE_Base.xlsx",
-      "categories": ["input_schemas", "sheets_read_write"],
-      "docs": ["data-lineage"],
-      "classification": "manual_review"
-    },
-    {
-      "path": "model_fjg.pkl",
-      "categories": ["rules", "transformations"],
-      "docs": ["data-lineage"],
-      "classification": "manual_review"
-    },
-    {
-      "path": "vectorizer_fjg.pkl",
-      "categories": ["rules", "transformations"],
-      "docs": ["data-lineage"],
-      "classification": "manual_review"
+      "globs": ["mkdocs.yml", "requirements-docs.txt", "docs/**", "docs/assets/**", "docs/diagramas/**"],
+      "documents": [],
+      "decision": "regenerate",
+      "reason": "Alterações na própria documentação ou na visualização exigem somente reconstrução e validação."
     }
   ]
 }

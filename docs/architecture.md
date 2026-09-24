@@ -4,7 +4,44 @@
 
 O sistema automatiza a extração da árvore de cargos da Prefeitura do Rio (Portal SICI) e a atualização do Mapeamento de Funções Estratégicas (MFE), além de cruzamentos de lideranças (Líderes Cariocas e Liderança Feminina). É uma aplicação de desktop em Python, com interface gráfica (Tkinter), scraping via Selenium/Chrome e processamento de planilhas via pandas/openpyxl.
 
-O ponto de entrada é `painel_principal.py`; o pacote pode ser distribuído como executável `--onedir` via PyInstaller. O diagrama de componentes está na página [Início](index.md).
+O ponto de entrada é `painel_principal.py`; o pacote pode ser distribuído como executável `--onedir` via PyInstaller.
+
+## Componentes e fronteiras
+
+```mermaid
+flowchart TB
+    user[Usuário]:::external
+    sici[Portal SICI]:::external
+    subgraph app[Aplicação desktop]
+        panel[[painel_principal.py]]:::code
+        scraper[[scraper_sici_nome.py]]:::code
+        mfe[[atualizador_MFE.py]]:::code
+        ml[[area_negocio_ml.py]]:::code
+        tercis[[calculadora_tercis.py]]:::code
+        leaders[[match_lideres.py / gestores_equipes.py]]:::code
+        config[[config_manager.py]]:::code
+    end
+    subgraph resources[Arquivos locais]
+        cfg[/config.txt/]:::document
+        base[(MFE_Base.xlsx)]:::data
+        models[/model_fjg.pkl / vectorizer_fjg.pkl/]:::document
+    end
+
+    user --> panel
+    panel --> scraper
+    panel --> mfe
+    panel --> leaders
+    scraper --> sici
+    scraper --> config --> cfg
+    mfe --> ml --> models
+    mfe --> tercis
+    mfe --> base
+
+    classDef data fill:#E3EDFF,stroke:#4A7BE8,color:#173467;
+    classDef document fill:#EAE3FA,stroke:#8760C8,color:#30204E;
+    classDef code fill:#F0EAFE,stroke:#7554B9,color:#30204E;
+    classDef external fill:#FFF7D8,stroke:#C9AC2D,color:#4B3D0C,stroke-dasharray:5 3;
+```
 
 ## Organização dos módulos
 

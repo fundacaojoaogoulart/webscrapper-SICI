@@ -1,0 +1,2 @@
+/* Optional site text color: customize the hex chosen at init. */
+:root { --md-default-fg-color: #263238; }

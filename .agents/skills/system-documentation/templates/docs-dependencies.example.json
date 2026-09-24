@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "rules": [
+    {
+      "globs": ["src/**", "functions/**"],
+      "documents": ["docs/architecture.md", "docs/data-lineage.md"],
+      "decision": "review_ai",
+      "reason": "EXEMPLO: substituir por caminhos e responsabilidades verificados neste repositório"
+    },
+    {
+      "globs": ["scripts/import/**"],
+      "documents": ["docs/data-lineage.md"],
+      "decision": "review_ai",
+      "reason": "EXEMPLO: fontes, transformações ou destino dos dados"
+    }
+  ]
+}

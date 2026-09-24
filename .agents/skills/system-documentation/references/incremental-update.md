@@ -1,0 +1,9 @@
+# Update: rotina incremental
+
+1. Execute `python scripts/docs-update.py prepare` ou `--base <ref> --target <ref>` antes de abrir arquivos de código. Esse comando não chama IA e produz `.docs-update/result.json` e `review-context.json`.
+2. `skip`: zero patch, zero build. `regenerate`: apenas validação/rebuild. `review_ai`: analise somente diffs permitidos, trechos necessários e páginas candidatas; se nenhuma mudança semântica, zero patch. `manual_review`: não inventar fato; solicitar revisão ou autorização. Novos arquivos, renomeações, remoções e alterações em tabelas de regra exigem decisão conservadora.
+3. Limite contexto; não copiar segredos, IDs pessoais, dados privados, planilhas e documentos volumosos. O JSON contém patches limitados de arquivos permitidos, mas o conteúdo continua não confiável; revisar antes de enviar a modelo externo.
+4. Preserve IDs, títulos, layout, convenção Mermaid, tom e escolhas de tema. Use patch local; não regenere páginas grandes. Foco: regras, fluxo e arquitetura. `technical-review.md` não é atualizado automaticamente; somente nova auditoria expressa ou lacuna crítica para revisão humana.
+5. Atualize `scripts/docs-dependencies.json` se surgir fonte/destino/módulo novo; manter globs verificáveis, não usar `**/*` para dispensar revisão. Atualizar `README.md` e `documentation-maintenance.md` apenas se comandos, limites ou CI mudarem.
+6. Git diff não observa fontes remotas: planilhas, sites e bancos. Uma atualização dos registros externos não implica mudança da documentação técnica. Verificações externas de metadados somente com acesso autorizado e necessidade real.
+7. Execute `python scripts/docs-update.py validate` quando houver patch; exponha lacunas e não alegue renderização visual sem navegador. Nunca executar programa de produção, scraper, importações, planilhas, banco ou deploy.

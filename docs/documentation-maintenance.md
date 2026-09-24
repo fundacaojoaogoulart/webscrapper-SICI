@@ -2,99 +2,70 @@
 
 ## Objetivo
 
-O fluxo local identifica, por Git diff e regras determinísticas, se uma alteração pode afetar a arquitetura ou a linhagem dos dados. Ele evita usar IA como etapa de classificação e prepara contexto mínimo apenas quando houver possível impacto semântico.
+O fluxo local segue: triagem Git determinística → contexto mínimo → revisão semântica somente quando necessária → validação. A triagem não usa IA e não prova, sozinha, a ausência de alteração semântica.
 
-`technical-review.md` é o registro da auditoria inicial. Não é reescrito por este fluxo; nova revisão técnica depende de solicitação explícita ou de uma alteração relevante que precise de validação humana.
+`technical-review.md` é a fotografia da auditoria inicial. Não é reescrito nas atualizações habituais.
 
 ## Ambiente
 
-As ferramentas rodam com o Python da `.venv-docs`, que contém MkDocs, Selenium e openpyxl:
+Use o Python da `.venv-docs` para instalar as dependências exclusivas da documentação:
 
 ```powershell
 python -m venv .venv-docs
 .\.venv-docs\Scripts\python.exe -m pip install -r requirements-docs.txt
 ```
 
-Nos exemplos abaixo, `python` significa o Python da `.venv-docs` (`.\.venv-docs\Scripts\python.exe` no Windows). A validação precisa dessa venv para renderizar os diagramas com Chrome/Edge e para o `mkdocs build`.
+Nos comandos a seguir, `python` representa esse interpretador. O site é local e privado, gerado em `.docs/mkdoc`.
+
+Instale também o navegador usado na validação visual:
+
+```powershell
+python -m playwright install chromium
+```
 
 ## Triagem
 
 ```powershell
-python scripts/docs-impact.py
+python scripts/docs-update.py prepare
 ```
 
-Por padrão, compara a árvore de trabalho com `HEAD`, incluindo arquivos não rastreados que não estejam ignorados. Para outros cenários:
+O comando compara `HEAD` com a árvore de trabalho, incluindo não rastreados não ignorados. Para comparar revisões, use `--base origin/main --target HEAD`; o cálculo usa o merge-base.
 
-```powershell
-python scripts/docs-impact.py --staged
-python scripts/docs-impact.py --base origin/main --head HEAD
-```
-
-O resultado é impresso em JSON e salvo localmente em `.docs-impact/impact.json`. Quando houver impacto possível, `.docs-impact/context.md` contém somente o diff relevante, os documentos candidatos e as convenções de atualização. O diretório é ignorado pelo Git.
-
-O mapeamento versionado fica em `scripts/docs-dependencies.json`. Ele associa módulos a arquitetura e linhagem, e deve ser atualizado quando uma fonte, destino de dados, integração ou módulo novo for confirmado.
+Os resultados locais e ignorados são `.docs-update/result.json` e `.docs-update/review-context.json`. O segundo contém apenas diffs de arquivos de código permitidos, com limites de tamanho e exclusão de caminhos de credenciais conhecidos. O mapeamento versionado fica em `scripts/docs-dependencies.json`.
 
 ### Decisão
 
-- `needsAgent: false`: somente arquivos ignorados ou sem impacto conhecido foram alterados; não atualize a documentação.
-- `needsAgent: true`: a alteração pode ter impacto. Revise o pacote de contexto e faça uma atualização localizada, ou conclua que a documentação permanece correta.
-- `requiresHumanReview: true`: schema de planilha, binários de modelo (`.pkl`), configuração de runtime ou módulo novo/desconhecido exigem decisão humana antes de registrar um novo comportamento como confirmado.
-
-Alterações em componentes internos não são descartadas apenas pelo tamanho: elas seguem para avaliação quando pertencem a áreas mapeadas. Arquivos novos de código também são conservadoramente sinalizados.
+| Classificação | Ação |
+|---|---|
+| `skip` | Sem impacto conhecido; não atualizar nem reconstruir. |
+| `regenerate` | Validar e reconstruir sem IA. |
+| `review_ai` | O agente examina o contexto mínimo e propõe patch localizado ou nenhuma mudança. |
+| `manual_review` | Exige confirmação humana antes de documentar comportamento. |
 
 ## Atualização com agente
 
-O comando local integrado é:
-
 ```powershell
-python scripts/docs-update.py
-python scripts/docs-update.py --model "provedor/modelo"
+python scripts/docs-update.py update
 ```
 
-Ele executa a triagem, encerra sem chamar IA quando `needsAgent` for `false` e, havendo impacto, chama `opencode run`. O modelo é opcional: sem `--model`, o OpenCode usa o padrão configurado pelo usuário; com ele, a escolha vale somente para aquela execução. Nenhuma conta, provedor, modelo ou credencial é versionado no repositório.
+Esse comando **não chama LLM**. Ele prepara o contexto e valida quando a decisão é `regenerate`; nos casos `review_ai` e `manual_review`, informa que é necessária revisão localizada.
 
-Cada pessoa deve instalar a CLI OpenCode, conectar sua própria conta e escolher os modelos disponíveis localmente. Por exemplo, execute `opencode auth login <provedor>` (ex.: `openai`) e use `/models` para conferir os identificadores aceitos. O comando não tenta autenticar, salvar credenciais nem instalar a CLI. Se ela não estiver disponível, o contexto permanece em `.docs-impact/context.md` para execução manual.
+No OpenCode, selecione o agente `documentation-engineer`, use a skill `system-documentation` no modo `update` e solicite a revisão de `.docs-update/review-context.json`. O agente deve modificar apenas os documentos impactados e o mapa, quando necessário. Não são versionados modelo, conta, credenciais ou tokens.
 
-Por segurança, a execução automática interrompe quando a triagem exige revisão humana. Após revisar o contexto, use `python scripts/docs-update.py --allow-review` para permitir que a IA documente somente fatos comprovados, preservando a incerteza. Use `--dry-run` para preparar e inspecionar o contexto sem chamar o modelo.
+### Disparo manual e CI
 
-O agente recebe apenas a instrução para ler o pacote local e pode modificar exclusivamente os documentos afetados e, se necessário, `scripts/docs-dependencies.json`. O orquestrador calcula hashes antes e depois, preserva qualquer alteração fora do escopo para revisão e falha sem revertê-la. Em caso de êxito, executa a validação documental.
+O workflow `.github/workflows/verify.yml` executa triagem e validação em pull requests e pushes na `main`, publicando `.docs-update/` como artefato `documentation-triage`.
 
-### Disparo manual e sinalização
-
-O fluxo é **sempre manual**: nada é acionado automaticamente por hook de Git ou pipeline. Após alterar código que possa afetar a documentação, execute `python scripts/docs-update.py`.
-
-Quando há impacto mas a CLI `opencode` não está no `PATH`, o comando emite o alerta **“IA não acionada para ajustes na documentação por falta de 'opencode' no PATH”**, informa os documentos afetados, preserva `.docs-impact/context.md` e encerra com código de saída `3`. O motivo também é gravado de forma estruturada em `.docs-impact/impact.json`, no campo `aiAction`, para ser lido por scripts ou CI. Os estados possíveis são:
-
-| `aiAction.status` | Significado | Código de saída |
-|---|---|---|
-| `not-needed` | Sem impacto; IA não acionada | 0 |
-| `human-review-required` | Triagem exige revisão humana | 2 |
-| `dry-run` | Somente preparação; IA não acionada | 0 |
-| `not-run` (`reason: opencode-missing`) | Impacto detectado, mas CLI ausente | 3 |
-| `failed` | A execução da IA falhou | 4 |
-| `out-of-scope` | A IA alterou arquivos fora do escopo | 5 |
-| `validation-failed` | Validação documental reprovada | 6 |
-| `completed` | Atualização concluída e validada | 0 |
+A revisão por IA é opcional e fica disponível somente em `workflow_dispatch` com `run_ai=true`. Ela requer a variável `DOCS_AI_MODEL`, a credencial do provedor (`OPENAI_API_KEY` no template) e OpenCode no `PATH`. Não roda em PR não confiável, não faz commit automático e publica a proposta em `documentation-proposal.patch` como artefato.
 
 ## Validação
 
 ```powershell
-python scripts/docs-validate.py
-python scripts/docs-impact.py --test
+python scripts/docs-update.py validate
 ```
 
-`docs-validate.py` verifica cercas Markdown, links e âncoras locais, valida a sintaxe estrutural de cada diagrama Mermaid, renderiza os diagramas usando o bundle local `docs/assets/mermaid.min.js` quando um navegador Chrome/Edge está disponível e executa `mkdocs build --strict`. Quando existe `.docs-impact/impact.json`, também aponta mudanças documentais fora do escopo indicado pela triagem.
-
-Para tornar a renderização obrigatória:
-
-```powershell
-python scripts/docs-validate.py --require-render
-```
-
-Defina `CHROME_PATH` se o navegador não estiver em um caminho conhecido. Sem navegador, a validação informa que a renderização foi ignorada; a sintaxe Mermaid e o build MkDocs continuam verificados.
-
-Os testes sintéticos (`docs-impact.py --test`) não usam Selenium, planilhas reais ou outros recursos externos. Eles cobrem alteração sem impacto, seletor/campo do scraper, regra de correspondência, schema de planilha, geração do `.exe`, mudança que requer revisão humana e alteração de dados externos sem mudança de funcionamento.
+Esse comando verifica as cinco páginas exigidas, links locais, cercas Markdown, estrutura Mermaid, mapa de dependências, executa `mkdocs build --strict` e renderiza os diagramas em Chromium com Playwright. A validação exige `playwright` e o navegador Chromium instalados.
 
 ## Fontes externas
 
-O Git não observa mudanças diretas no Portal SICI nem nas bases externas (Ordenadores, Empenhos, lideranças). O repositório versiona os schemas conhecidos (`MFE_Base.xlsx` e o mapeamento), que já são cobertos pela triagem. Não foi implementado monitoramento externo porque não há necessidade demonstrada nem acesso autorizado. Se isso mudar, a verificação deve comparar somente metadados de abas e cabeçalhos esperados — nunca importar todos os registros — e exigir autorização explícita.
+Git não observa mudanças diretas no Portal SICI nem nas bases externas de ordenadores, empenhos e lideranças. Registros individuais não exigem, por si, alteração da documentação técnica. Se o schema externo puder afetar o fluxo, revise somente metadados autorizados, como abas e cabeçalhos, sem importar dados pessoais.

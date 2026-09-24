@@ -1,5 +1,5 @@
+# TEMPLATE OPT-IN: install only on explicit user approval via setup-ci.
 name: Documentation verification
-
 on:
   pull_request:
   push:
@@ -10,10 +10,8 @@ on:
         description: 'Execute OpenCode for semantic review (requires configured model/auth)'
         type: boolean
         default: false
-
 permissions:
   contents: read
-
 jobs:
   documentation:
     runs-on: ubuntu-latest
@@ -26,7 +24,6 @@ jobs:
         with:
           python-version: '3.12'
       - run: python -m pip install -r requirements-docs.txt
-      - run: python -m playwright install --with-deps chromium
       - name: Prepare diff triage
         shell: bash
         env:

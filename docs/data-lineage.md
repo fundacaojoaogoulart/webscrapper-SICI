@@ -14,26 +14,32 @@ Este documento descreve como as informações chegam ao sistema, são processada
 ## 1. Fluxo completo
 
 ```mermaid
-flowchart TD
-    P["Usuário aciona o Painel"] --> M{Modo}
-    M -- "web" --> S["iniciar_raspagem()"]
-    M -- "offline" --> X["Excel SICI já extraído"]
-    S --> S1["Chrome percorre a árvore, filtra e captura órgão, escalão, área, cargo, titular"]
-    S1 --> EX["sici_extracao_AAAAMMDD_HHMM.xlsx"]
+flowchart TB
+    P["Usuário aciona o Painel"]:::task --> M{Modo}:::decision
+    M -- "web" --> S[["iniciar_raspagem()"]]:::code
+    M -- "offline" --> X[("Excel SICI já extraído")]:::data
+    S --> S1["Chrome percorre a árvore, filtra e captura órgão, escalão, área, cargo, titular"]:::task
+    S1 --> EX[/"sici_extracao_AAAAMMDD_HHMM.xlsx"/]:::document
     X --> Q1
     EX --> Q1
-    Q1{"Atualizar MFE?"}
+    Q1{"Atualizar MFE?"}:::decision
     Q1 -- "Não" --> Q2
-    Q1 -- "Sim" --> MFE["atualizar_planilha_mfe()"]
-    MFE --> MFE1["Classifica: config + ML + ordenadores + tercis"]
-    MFE1 --> MFE2["Recria a aba editável a partir de MFE_Base"]
-    MFE2 --> OUT["MFE_Atualizada.xlsx"]
+    Q1 -- "Sim" --> MFE[["atualizar_planilha_mfe()"]]:::code
+    MFE --> MFE1["Classifica: config + ML + ordenadores + tercis"]:::task
+    MFE1 --> MFE2["Recria a aba editável a partir de MFE_Base"]:::task
+    MFE2 --> OUT[/"MFE_Atualizada.xlsx"/]:::document
     OUT --> Q2
-    Q2{"Cruzar lideranças?"}
-    Q2 -- "Não" --> FIM["Fim"]
-    Q2 -- "Sim" --> LID["cruzar_planilhas()"]
-    LID --> OUT2["planilha_cruzamento_PLC ou PRLF.xlsx"]
+    Q2{"Cruzar lideranças?"}:::decision
+    Q2 -- "Não" --> FIM["Fim"]:::task
+    Q2 -- "Sim" --> LID[["cruzar_planilhas()"]]:::code
+    LID --> OUT2[/"planilha_cruzamento_PLC ou PRLF.xlsx"/]:::document
     OUT2 --> FIM
+
+    classDef data fill:#E3EDFF,stroke:#4A7BE8,color:#173467;
+    classDef document fill:#EAE3FA,stroke:#8760C8,color:#30204E;
+    classDef task fill:#E3EDFF,stroke:#4A7BE8,color:#173467;
+    classDef code fill:#F0EAFE,stroke:#7554B9,color:#30204E;
+    classDef decision fill:#FFF0DF,stroke:#B77928,color:#50370D;
 ```
 
 ---
@@ -95,7 +101,19 @@ O titular do SICI é associado ao tercil pela chave de nome normalizado (`atuali
 - **Titular vago/ausente:** ordenador = `Não` e tercis = `1 - Não ordena despesa | 0 empenho(s)`.
 - **Homônimos:** a correspondência por nome normalizado não distingue pessoas de mesmo nome (ordenadores, lideranças e tercis usam apenas o nome).
 - **Registros duplicados do SICI:** colapsados pela chave composta; o último valor prevalece.
-- **Cruzamento de lideranças sem tarefa:** ver limitação na seção 6.
+- **Cruzamento de lideranças sem tarefa:** o achado P3 da [Avaliação técnica](technical-review.md) registra que uma tarefa sem uso impede a seleção da base correspondente.
+
+### Limitações comprovadas e ação humana
+
+| Condição | Resultado implementado | Limitação ou ação humana necessária | Evidência |
+|---|---|---|---|
+| Não há de-para de cargo ou órgão | F ou H ficam vazios | Manter `[TIPOS_CARGO]` e `[MACRO_AREAS]` em `config.txt` | `atualizador_MFE.py:254-255` |
+| Confiança do ML abaixo de 75% | G recebe marca de revisão manual | Conferir o valor; o sistema não registra a confirmação | `area_negocio_ml.py:101-108` |
+| Ordenadores não são verificados | J recebe `1 - Não` para todos | Não interpretar esse valor como confirmação; selecionar a base quando aplicável | `atualizador_MFE.py:234-252` |
+| Nomes homônimos | Correspondência por nome normalizado | Conferir manualmente ordenadores, lideranças e tercis | regras descritas nesta seção |
+| Chave SICI duplicada | O último registro sobrescreve o anterior | Investigar a duplicidade na fonte quando relevante | `sici_keys` em `atualizador_MFE.py` |
+| Coleta interrompida | Arquivo parcial e próximos passos podem ser gerados | Confirmar completude antes de usar a extração | `scraper_sici_nome.py:303-358` |
+| Nova execução do MFE | Aba editável é reconstruída | Preservar alterações manuais fora da saída ou atualizá-las na base | `atualizador_MFE.py:306-332` |
 
 ---
 
@@ -141,7 +159,7 @@ Abaixo, cada campo identificado pelo nome, com sua origem, o grau de automação
 
 ### Cenário: criação de uma nova secretaria
 
-Quando um novo órgão entra no Portal SICI, **não basta rodar o programa**. A raspagem e as cópias (B, C, D, E, M) se resolvem sozinhas, mas os campos que dependem de **de-para** (`Tipo de Cargo`, `Macro Área`) **ficam vazios** e os que dependem de **bases externas** (ordenadores, empenhos, lideranças) **ficam errados** até que alguém cadastre os novos dados manualmente.
+Quando um novo órgão entra no Portal SICI, **não basta rodar o programa**. A raspagem e as cópias (B, C, D, E, M) se resolvem sozinhas, mas os campos que dependem de **de-para** (`Tipo de Cargo`, `Macro Área`) **ficam vazios**. Os campos dependentes de **bases externas** (ordenadores, empenhos, lideranças) usam os valores padrão ou deixam de encontrar correspondências até que alguém atualize as bases manualmente.
 
 #### Documentos (arquivos) que precisam ser atualizados
 
@@ -150,11 +168,11 @@ Quando um novo órgão entra no Portal SICI, **não basta rodar o programa**. A 
 | `config.txt` → `[MACRO_AREAS]` | adicionar `sigla_do_orgao = Macro Área` | H | H fica **vazia** |
 | `config.txt` → `[TIPOS_CARGO]` | adicionar de-para para cada **cargo** novo do órgão | F (e indiretamente I) | F fica **vazia** |
 | `config.txt` → `[CARGO_EXATO]` / `[AREA_CONTEM]` | se houver cargo/área com poder de decisão específico | L | L pode sair como `1 - Não possui…` |
-| Base de Ordenadores (SIAFIC) | incluir os novos titulares ordenadores | J | J sai `1 - Não` (errado) |
+| Base de Ordenadores (SIAFIC) | incluir os novos titulares ordenadores | J | J sai `1 - Não`, valor que não distingue ausência de verificação de não-ordenador |
 | Base de Empenhos (SUPOR) | incluir os empenhos dos novos titulares | K | K sai `1 - Não ordena despesa` |
 | Base de lideranças (Minibios / Liderança Feminina) | incluir os novos nomes (se for cruzar) | cruzamentos | líderes não são encontrados |
 
-**Chave do de-para:** a chave de `[MACRO_AREAS]` (e de `[TIPOS_CARGO]`) é o texto **normalizado** do campo raspado. `normalizar()` (`config_manager.py:193-200`) deixa tudo em minúsculas, remove acentos e apaga tudo que não for letra/número. Use exatamente a forma como o portal devolve o `órgão`/`cargo` — normalmente a **sigla** (ex.: `sme`), não o nome por extenso.
+**Chave do de-para:** a chave de `[MACRO_AREAS]` (e de `[TIPOS_CARGO]`) é o texto **normalizado** do campo raspado. `normalizar()` (`config_manager.py:193-200`) deixa tudo em minúsculas, remove acentos e apaga tudo que não for letra/número. Use a forma normalizada do `órgão`/`cargo` retornado na extração; a apresentação atual do portal não foi verificada nesta auditoria.
 
 #### Partes da documentação que devem ser mantidas coerentes
 
@@ -263,7 +281,7 @@ Modelo da planilha de Mapeamento de Funções Estratégicas. Possui 7 abas (`LEI
 | Arquivo | Conteúdo | Como é gerado |
 |---|---|---|
 | `sici_extracao_AAAAMMDD_HHMM.xlsx` | extração bruta do SICI + `data_extracao` | `df.to_excel()` no scraper |
-| `sici_parcial.xlsx` | contingência a cada 20 registros | `df.to_excel()` no scraper |
+| `sici_parcial.xlsx` | contingência a cada 20 iterações | `df.to_excel()` no scraper |
 | `MFE_Atualizada.xlsx` | cópia de `MFE_Base.xlsx` com a aba editável regravada | `shutil.copy` + `openpyxl` |
 | `planilha_cruzamento_PLC.xlsx` / `_PRLF.xlsx` | lideranças encontradas em funções estratégicas | `df.to_excel()` em `match_lideres.py` |
 | `resultado_cruzamento_{tarefa}.xlsx` | cruzamento CGGI (painel independente) | `df.to_excel()` em `gestores_equipes.py` |

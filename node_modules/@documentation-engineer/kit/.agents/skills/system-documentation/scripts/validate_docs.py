@@ -16,12 +16,6 @@ import subprocess
 import sys
 from urllib.parse import unquote
 
-for _stream in (sys.stdout, sys.stderr):
-    try:
-        _stream.reconfigure(encoding='utf-8', errors='replace')
-    except Exception:
-        pass
-
 REQUIRED = ['index.md', 'architecture.md', 'data-lineage.md', 'technical-review.md', 'documentation-maintenance.md']
 LINK = re.compile(r'(?<!!)\[[^]]*\]\(([^)]+)\)')
 
@@ -87,11 +81,11 @@ def validate(repo: Path) -> list[str]:
 
 
 def validate_visual(repo: Path) -> list[str]:
-    """Browser-level Mermaid check. Requires Playwright and Chromium."""
+    """Optional browser-level Mermaid check. Requires Playwright + available Chromium/Chrome/Edge."""
     try:
         from playwright.sync_api import sync_playwright
     except ImportError:
-        return ['Visual check requires Playwright: python -m pip install -r requirements-docs.txt; python -m playwright install chromium']
+        return ['Visual check requires optional Playwright: python -m pip install playwright; python -m playwright install chromium']
     site = repo / '.docs' / 'mkdoc'
     if not (site / 'index.html').is_file():
         return ['Visual check requires a successful MkDocs build']
@@ -135,7 +129,7 @@ def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument('--repo', default='.')
     ap.add_argument('--build', action='store_true', help='Run mkdocs build --strict (requires mkdocs-material)')
-    ap.add_argument('--visual', action='store_true', help='Test Mermaid SVG in a headless Chromium browser')
+    ap.add_argument('--visual', action='store_true', help='Additionally test Mermaid SVG in a headless browser (optional Playwright)')
     args = ap.parse_args(argv)
     repo = Path(args.repo).resolve()
     issues = validate(repo)
@@ -143,10 +137,7 @@ def main(argv=None) -> int:
         if not shutil.which('mkdocs'):
             issues.append('mkdocs executable not installed (install mkdocs-material)')
         elif not issues:
-            proc = subprocess.run(
-                ['mkdocs', 'build', '--strict'], cwd=repo, capture_output=True, text=True,
-                env={**os.environ, 'NO_MKDOCS_2_WARNING': 'true'},
-            )
+            proc = subprocess.run(['mkdocs', 'build', '--strict'], cwd=repo, capture_output=True, text=True)
             if proc.returncode:
                 issues.append(f'mkdocs build failed:\n{proc.stdout}\n{proc.stderr}')
     if args.visual and not issues:

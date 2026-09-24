@@ -1,0 +1,14 @@
+/* Escolhas visuais registradas no init da documentação. */
+:root {
+  --md-primary-fg-color: #094a75;
+  --md-primary-fg-color--light: #0085b3;
+  --md-primary-fg-color--dark: #094a75;
+  --md-accent-fg-color: #0085b3;
+  --md-default-fg-color: #094a75;
+  --md-primary-bg-color: #ecf1f4;
+  --md-primary-bg-color--light: #ecf1f4;
+}
+
+body, .md-typeset {
+  font-family: Overpass, sans-serif;
+}

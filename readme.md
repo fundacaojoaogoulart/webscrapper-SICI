@@ -1,6 +1,20 @@
 # 🤖 Automação SICI - Prefeitura do Rio
 
-📐 **Documentação para desenvolvedores:** [arquitetura, fluxo de dados e sequência](docs/arquitetura.md).
+📐 **Documentação para desenvolvedores:** [arquitetura, fluxo de dados e sequência](docs/index.md).
+
+## Documentação técnica local
+
+```powershell
+python -m pip install -r requirements-docs.txt
+python -m playwright install chromium
+python -m mkdocs serve
+python -m mkdocs build --strict
+python scripts/docs-update.py prepare
+python scripts/docs-update.py update
+python scripts/docs-update.py validate
+```
+
+Veja o procedimento em [Manutenção incremental da documentação](docs/documentation-maintenance.md). O GitHub Actions valida a documentação em pull requests e pushes na `main`; a revisão por IA é opcional e manual.
 
 Este projeto é um conjunto de ferramentas de Web Scraping e Processamento de Dados desenvolvido para automatizar a extração de dados do SICI, atualizar a planilha do MFE (Mapeamento de Funções Estratégicas) com os dados extraídos e validar a prevalencia de lideranças (Líderes Cariocas e Lideranças Femininas) em cargos, além de fornecer planilhas de auditoria sobre os dados adicionados e excuiídos da planilha do MFE.
 

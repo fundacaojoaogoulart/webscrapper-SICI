@@ -1,0 +1,28 @@
+# Gerado no modo init; preencha as escolhas do usuário, mantenha a saída privada.
+site_name: Documentação do Sistema
+docs_dir: docs
+site_dir: .docs/mkdoc
+theme:
+  name: material
+  language: pt-BR
+  font:
+    text: Roboto # substitua após escolha inicial do usuário
+  palette:
+    primary: indigo # escolha inicial
+    accent: blue # escolha inicial
+nav:
+  - Início: index.md
+  - Fluxo dos dados: data-lineage.md
+  - Arquitetura: architecture.md
+  - Avaliação técnica: technical-review.md
+  - Manutenção: documentation-maintenance.md
+extra_css:
+  - stylesheets/extra.css # somente se criado para cor de texto personalizada
+markdown_extensions:
+  - tables
+  - toc
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format

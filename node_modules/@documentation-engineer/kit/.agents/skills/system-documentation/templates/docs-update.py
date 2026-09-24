@@ -9,12 +9,6 @@ import re
 import subprocess
 import sys
 
-for _stream in (sys.stdout, sys.stderr):
-    try:
-        _stream.reconfigure(encoding='utf-8', errors='replace')
-    except Exception:
-        pass
-
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
 STATE = ROOT / '.docs-update'
@@ -104,7 +98,7 @@ def prepare(args):
 
 
 def validate():
-    result = run(sys.executable, str(HERE / 'docs-validate.py'), '--repo', str(ROOT), '--build', '--visual')
+    result = run(sys.executable, str(HERE / 'docs-validate.py'), '--repo', str(ROOT), '--build')
     print(result.stdout)
     if result.stderr:
         print(result.stderr, file=sys.stderr)
