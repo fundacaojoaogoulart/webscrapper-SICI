@@ -144,6 +144,7 @@ venv.bak/
 # documentação MkDocs e contexto local de revisão
 .docs/mkdoc/
 .docs-update/
+resultados_http/
 
 # mypy
 .mypy_cache/
