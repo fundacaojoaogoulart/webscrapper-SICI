@@ -245,6 +245,8 @@ Modelo da planilha de Mapeamento de Funções Estratégicas. Possui 7 abas (`LEI
 
 ## 5. Processo de scraping
 
+**Alternativa experimental HTTP (separada do Selenium descrito abaixo):** em `scraper_sici_http.py`, a descoberta seleciona raízes A/D de nível 1, aplica o escopo de órgão e o filtro de palavras ignoradas e distribui a coleta por órgão em sessões independentes (padrão: 4 trabalhadores). Após o término das tarefas, os registros são agregados na ordem original dos órgãos na árvore, não na ordem de conclusão. Falhas por órgão preservam os registros já coletados e tornam a coleta incompleta (`PARCIAL`), sem comparação automática da coleta interrompida. `segundos_coleta` mede o tempo decorrido; `segundos_http` soma tempos de requisições concorrentes e pode superá-lo, não sendo medida equivalente. Evidência: diff de `ColetorHTTP._coletar_orgao()`, `ColetorHTTP.coletar()` e `main()`, além do contrato no cabeçalho do módulo. O comportamento em execução e a equivalência com o Selenium não foram verificados nesta revisão.
+
 - **Acionamento:** botão "1. Iniciar Raspagem Web" do painel, que executa `scraper_sici_nome.iniciar_raspagem()` em uma thread (`painel_principal.py:14-26`). Também pode ser chamado diretamente (`python scraper_sici_nome.py`).
 - **Navegação:** `webdriver.Chrome` abre o portal, com `WebDriverWait` e espera por callbacks do ASP.NET (`Sys.WebForms.PageRequestManager`).
 - **Coleta:** percorre a árvore; para cada nó, clica/expande e lê os campos do painel. O `escalão` é calculado conforme o nível e o tipo de órgão:

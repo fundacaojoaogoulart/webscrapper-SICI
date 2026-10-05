@@ -1,7 +1,7 @@
 """Entrada interativa do executável experimental SICI HTTP.
 
 Compilar: python -m PyInstaller --clean --noconfirm --onefile --console
-    --name SICI_HTTP_Teste --icon icon.ico iniciar_sici_http.py
+    --name SICI_HTTP_Paralelo --icon icon.ico iniciar_sici_http.py
 Distribua também o config.txt atual ao lado do executável.
 """
 
@@ -32,7 +32,7 @@ def iniciar():
         return main(sys.argv[1:])
     codigo = 0
     try:
-        print("SICI HTTP - TESTE DE EXTRACAO\n")
+        print("SICI HTTP - EXTRACAO PARALELA (4 trabalhadores)\n")
         print("1 - Extracao completa por HTTP")
         print("2 - Extracao completa e comparacao com Excel do Selenium")
         print("3 - Comparar dois arquivos ja extraidos")

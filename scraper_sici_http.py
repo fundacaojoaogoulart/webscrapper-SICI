@@ -4,6 +4,7 @@ Exemplos:
     python scraper_sici_http.py --orgao GBP --comparar sici_extracao_20261005_0900.xlsx
     python scraper_sici_http.py --comparar sici_extracao_20261005_0900.xlsx
     python scraper_sici_http.py --somente-comparar coleta_http.xlsx --comparar coleta_selenium.xlsx
+    python scraper_sici_http.py --trabalhadores 4 --comparar coleta_selenium.xlsx
 
 Saídas em resultados_http/: Excel com as seis colunas originais, JSON com
 tempos/status e relatório de comparação (resumo, contagens, faltantes, extras).
@@ -12,16 +13,21 @@ Use uma referência recente e o mesmo config.txt nas duas coletas. A comparaçã
 Uma linha alterada aparece como faltante + extra, sem associação por nomes.
 Código de saída: 0 = concluído/equivalente; 1 = coleta parcial; 2 = divergência.
 Uma coleta interrompida é salva como PARCIAL e não comparada automaticamente.
+Por padrão, quatro trabalhadores coletam órgãos com sessões independentes.
+O Excel mantém a ordem dos órgãos na árvore. segundos_coleta mede o tempo
+decorrido; segundos_http soma requisições concorrentes e pode superar esse tempo.
 """
 
 import argparse
 from collections import Counter
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from datetime import datetime
 import json
 from pathlib import Path
 import re
 import sys
+from threading import Event
 import time
 
 from bs4 import BeautifulSoup
@@ -65,7 +71,7 @@ def texto(elemento):
 
 
 class ColetorHTTP:
-    def __init__(self, timeout=30):
+    def __init__(self, timeout=30, ignoradas=None, cancelamento=None):
         self.sessao = requests.Session()
         # WebForms muda o HTML para clientes não reconhecidos (modo downlevel).
         self.sessao.headers["User-Agent"] = (
@@ -78,9 +84,14 @@ class ColetorHTTP:
         self.segundos_http = 0.0
         self.resultados = []
         self.visitados = set()
-        self.ignoradas = config_manager.ler_config()["PALAVRAS_IGNORADAS"]
+        self.ignoradas = list(config_manager.ler_config()["PALAVRAS_IGNORADAS"] if ignoradas is None else ignoradas)
+        self.cancelamento = cancelamento if cancelamento is not None else Event()
+        self.orgaos = []
+        self.trabalhadores_utilizados = 0
 
     def requisitar(self, dados=None):
+        if self.cancelamento.is_set():
+            raise RuntimeError("Coleta cancelada.")
         inicio = time.perf_counter()
         try:
             if dados is None:
@@ -183,6 +194,8 @@ class ColetorHTTP:
         self.resultados.append(dict(zip(CAMPOS, [orgao, escalao, area, cargo, titular])))
 
     def percorrer(self, no, orgao, tipo):
+        if self.cancelamento.is_set():
+            raise RuntimeError("Coleta cancelada.")
         if no.caminho in self.visitados:
             raise RuntimeError(f"Nó visitado mais de uma vez: {no.caminho}")
         self.visitados.add(no.caminho)
@@ -200,17 +213,83 @@ class ColetorHTTP:
                 raise RuntimeError(f"Hierarquia inesperada: {filho.caminho}")
             self.percorrer(filho, orgao, tipo)
 
-    def coletar(self, orgao=None):
+    def _coletar_orgao(self, no):
+        """Uma tarefa possui sessão, cookies, VIEWSTATE e resultados próprios."""
+        inicio = time.perf_counter()
+        coletor = None
+        erro = None
+        try:
+            coletor = ColetorHTTP(self.timeout, self.ignoradas, self.cancelamento)
+            coletor.requisitar()
+            atual = coletor.localizar(no.caminho)
+            if (atual.texto, atual.nivel, atual.tipo) != (no.texto, no.nivel, no.tipo):
+                raise RuntimeError("O órgão mudou entre a descoberta e a coleta.")
+            coletor.percorrer(atual, atual.texto, atual.tipo)
+        except Exception as exc:
+            erro = f"{type(exc).__name__}: {exc}"
+        finally:
+            if coletor is not None:
+                coletor.sessao.close()
+        registros = coletor.resultados if coletor is not None else []
+        return registros, {
+            "orgao": no.texto, "caminho": no.caminho,
+            "status": "PARCIAL" if erro else "concluida", "erro": erro,
+            "registros": len(registros),
+            "requisicoes": coletor.requisicoes if coletor is not None else 0,
+            "segundos_http": coletor.segundos_http if coletor is not None else 0.0,
+            "segundos_coleta": round(time.perf_counter() - inicio, 3),
+        }
+
+    def coletar(self, orgao=None, trabalhadores=4):
+        if trabalhadores < 1:
+            raise ValueError("O número de trabalhadores deve ser positivo.")
         self.requisitar()
         raizes = [n for n in self.nos() if n.nivel == 1 and n.tipo in {"A", "D"}]
         if orgao:
             raizes = [n for n in raizes if n.texto.casefold() == orgao.casefold()]
+        raizes = [n for n in raizes if n.texto and not any(p in n.texto.lower() for p in self.ignoradas)]
         if not raizes:
             raise RuntimeError("Nenhum órgão A/D encontrado para o escopo solicitado.")
-        for no in raizes:
-            print(f"Coletando {no.texto} (tipo {no.tipo})...", flush=True)
-            self.percorrer(no, no.texto, no.tipo)
-            print(f"  {len(self.resultados)} registros; {self.requisicoes} requisições", flush=True)
+        if len({n.caminho for n in raizes}) != len(raizes):
+            raise RuntimeError("Órgãos duplicados na árvore inicial.")
+        self.trabalhadores_utilizados = min(trabalhadores, len(raizes))
+        print(f"Coletando {len(raizes)} órgãos com {self.trabalhadores_utilizados} trabalhadores...", flush=True)
+        executor = ThreadPoolExecutor(max_workers=self.trabalhadores_utilizados, thread_name_prefix="sici")
+        tarefas = []
+        try:
+            for no in raizes:
+                tarefas.append(executor.submit(self._coletar_orgao, no))
+            for tarefa in as_completed(tarefas):
+                _, info = tarefa.result()
+                print(f"{info['orgao']}: {info['status']}, {info['registros']} registros "
+                      f"em {info['segundos_coleta']:.1f}s", flush=True)
+        except BaseException:
+            # Ctrl+C cancela a fila; tarefas em curso param antes da próxima requisição.
+            self.cancelamento.set()
+            for tarefa in tarefas:
+                tarefa.cancel()
+            raise
+        finally:
+            executor.shutdown(wait=True, cancel_futures=True)
+            # Agrega apenas após terminar as tarefas, na ordem original da árvore.
+            # Falhas preservam os registros já coletados e não viram sucesso.
+            for indice, no in enumerate(raizes):
+                tarefa = tarefas[indice] if indice < len(tarefas) else None
+                if tarefa is None or tarefa.cancelled():
+                    registros, info = [], {
+                        "orgao": no.texto, "caminho": no.caminho, "status": "cancelada",
+                        "erro": "Tarefa não executada.", "registros": 0,
+                        "requisicoes": 0, "segundos_http": 0.0, "segundos_coleta": 0.0,
+                    }
+                else:
+                    registros, info = tarefa.result()
+                self.resultados.extend(registros)
+                self.requisicoes += info["requisicoes"]
+                self.segundos_http += info["segundos_http"]
+                self.orgaos.append(info)
+        falhas = [info["orgao"] for info in self.orgaos if info["status"] != "concluida"]
+        if falhas:
+            raise RuntimeError("Coleta incompleta nos órgãos: " + ", ".join(falhas))
 
 
 def ler_extracao(caminho, orgao=None):
@@ -270,9 +349,12 @@ def main(argv=None):
     pasta_app = Path(sys.executable if getattr(sys, "frozen", False) else __file__).resolve().parent
     parser.add_argument("--saida-dir", type=Path, default=pasta_app / "resultados_http")
     parser.add_argument("--timeout", type=float, default=30, help="Timeout HTTP em segundos (padrão: 30)")
+    parser.add_argument("--trabalhadores", type=int, default=4, help="Órgãos simultâneos (padrão: 4; use 1 para execução serial)")
     args = parser.parse_args(argv)
     if args.timeout <= 0:
         parser.error("--timeout deve ser positivo")
+    if args.trabalhadores < 1:
+        parser.error("--trabalhadores deve ser positivo")
     if args.somente_comparar and not args.comparar:
         parser.error("--somente-comparar exige --comparar")
     if args.comparar:
@@ -282,10 +364,11 @@ def main(argv=None):
     arquivo = args.somente_comparar
     if arquivo is None:
         coletor = ColetorHTTP(args.timeout)
+        inicio_coleta = datetime.now().astimezone()
         inicio = time.perf_counter()
         erro = None
         try:
-            coletor.coletar(args.orgao)
+            coletor.coletar(args.orgao, args.trabalhadores)
             if not coletor.resultados:
                 raise RuntimeError("Coleta sem registros.")
         except (Exception, KeyboardInterrupt) as exc:
@@ -293,6 +376,7 @@ def main(argv=None):
         finally:
             coletor.sessao.close()
         duracao = time.perf_counter() - inicio
+        fim_coleta = datetime.now().astimezone()
         status = "PARCIAL" if erro else "concluida"
         arquivo = args.saida_dir / f"sici_http_{status}_{carimbo}.xlsx"
         df = pd.DataFrame(coletor.resultados, columns=CAMPOS)
@@ -303,10 +387,16 @@ def main(argv=None):
             "registros": len(df), "requisicoes": coletor.requisicoes,
             "segundos_coleta": round(duracao, 3),
             "segundos_http": round(coletor.segundos_http, 3),
+            "inicio_coleta": inicio_coleta.isoformat(), "fim_coleta": fim_coleta.isoformat(),
+            "trabalhadores_solicitados": args.trabalhadores,
+            "trabalhadores_utilizados": coletor.trabalhadores_utilizados,
+            "nota_tempos": "segundos_coleta é tempo decorrido, sem exportação/comparação; segundos_http é a soma das requisições concorrentes, incluindo descoberta.",
+            "orgaos": coletor.orgaos,
             "palavras_ignoradas": coletor.ignoradas,
         }
         arquivo.with_suffix(".json").write_text(json.dumps(metricas, ensure_ascii=False, indent=2), encoding="utf-8")
         print(f"{status}: {len(df)} registros em {duracao:.1f}s. Arquivo: {arquivo}")
+        print(f"Tempo total da coleta HTTP: {duracao / 60:.2f} minutos ({duracao:.1f} segundos).")
         if erro:
             print(f"Coleta incompleta: {erro}")
             return 1

@@ -6,6 +6,8 @@ O sistema automatiza a extração da árvore de cargos da Prefeitura do Rio (Por
 
 O ponto de entrada é `painel_principal.py`; o pacote pode ser distribuído como executável `--onedir` via PyInstaller.
 
+**Alternativa experimental HTTP (separada do fluxo Selenium):** `scraper_sici_http.py` coleta órgãos em paralelo com `ThreadPoolExecutor`, por padrão com 4 trabalhadores (`--trabalhadores`; `1` para execução serial), limitado ao número de órgãos selecionados. Cada tarefa por órgão cria seu próprio `ColetorHTTP`, com sessão HTTP, cookies, estado WebForms e resultados independentes. Essa alternativa não representa paralelização do Selenium nos diagramas abaixo. Evidência: `ColetorHTTP._coletar_orgao()`, `ColetorHTTP.coletar()` e argumento `--trabalhadores` em `main()`, no diff revisado.
+
 ## Componentes e fronteiras
 
 ```mermaid
