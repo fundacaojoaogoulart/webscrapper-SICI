@@ -41,7 +41,13 @@ URL = "https://sici.rio.rj.gov.br/PAG/principal.aspx"
 PREFIXO = "ContentPlaceHolder1_"
 ARVORE = PREFIXO + "ua_treeview"
 CAMPOS = ["órgão", "escalão", "área", "cargo", "titular"]
-COLUNAS = CAMPOS + ["data_extracao"]
+CAMPO_COMPETENCIAS = "competências"
+STATUS_COMPETENCIAS = "status_competencias"
+ERRO_COMPETENCIAS = "erro_competencias"
+COLUNAS = CAMPOS + [CAMPO_COMPETENCIAS, "data_extracao"]
+SELETOR_INFORMACOES = PREFIXO + "DDLInformacoesGerais"
+EVENTO_INFORMACOES = "ctl00$ContentPlaceHolder1$DDLInformacoesGerais"
+PAINEL_COMPETENCIAS = PREFIXO + "PanelCompetenciaInterno"
 EVENTO = re.compile(r"__doPostBack\('([^']*)','([^']*)'\)")
 
 
@@ -88,11 +94,17 @@ class ColetorHTTP:
         self.cancelamento = cancelamento if cancelamento is not None else Event()
         self.orgaos = []
         self.trabalhadores_utilizados = 0
+        self.trabalhadores_por_rodada = []
+        self.trabalhadores_configurados_por_rodada = []
+        self.etapa_atual = "inicialização"
+        self.unidade_atual = None
 
     def requisitar(self, dados=None):
         if self.cancelamento.is_set():
             raise RuntimeError("Coleta cancelada.")
         inicio = time.perf_counter()
+        if dados is None:
+            self.etapa_atual = "GET inicial"
         try:
             if dados is None:
                 resposta = self.sessao.get(URL, timeout=self.timeout)
@@ -131,9 +143,10 @@ class ColetorHTTP:
                 dados.append((nome, elemento.get("value", "")))
         return dados
 
-    def postback(self, alvo, argumento):
+    def postback(self, alvo, argumento, substituir=None):
         dados = [(k, v) for k, v in self.formulario()
-                 if k not in {"__EVENTTARGET", "__EVENTARGUMENT", "__ASYNCPOST"}]
+                 if k not in {"__EVENTTARGET", "__EVENTARGUMENT", "__ASYNCPOST", *(substituir or {})}]
+        dados.extend((chave, valor) for chave, valor in (substituir or {}).items())
         dados.extend([("__EVENTTARGET", alvo), ("__EVENTARGUMENT", argumento)])
         # POST completo: a resposta traz HTML e um novo VIEWSTATE juntos.
         # Não repetimos POSTs automaticamente: uma expansão pode ser um toggle.
@@ -170,6 +183,7 @@ class ColetorHTTP:
         return encontrados[0]
 
     def expandir(self, caminho):
+        self.etapa_atual = "expansão da árvore"
         no = self.localizar(caminho)
         if no.expandir:
             self.postback(*no.expandir)
@@ -181,6 +195,8 @@ class ColetorHTTP:
         return filhos
 
     def capturar(self, no, orgao, escalao):
+        self.unidade_atual = no.texto
+        self.etapa_atual = "seleção da unidade"
         self.postback("ctl00$ContentPlaceHolder1$ua_treeview", "s" + no.caminho)
         selecionado = self.pagina.find(id=ARVORE + "_SelectedNode")
         link = self.pagina.find(id=selecionado.get("value", "")) if selecionado else None
@@ -191,7 +207,63 @@ class ColetorHTTP:
         if elementos[0] is None:
             raise RuntimeError(f"Painel ausente após selecionar {no.texto}")
         area, cargo, titular = map(texto, elementos)
-        self.resultados.append(dict(zip(CAMPOS, [orgao, escalao, area, cargo, titular])))
+        registro = dict(zip(CAMPOS, [orgao, escalao, area, cargo, titular]))
+        registro[CAMPO_COMPETENCIAS] = ""
+        registro[STATUS_COMPETENCIAS] = "pendente"
+        registro[ERRO_COMPETENCIAS] = ""
+        self.resultados.append(registro)
+        try:
+            competencias = self.competencias(no.caminho, registro)
+            registro[CAMPO_COMPETENCIAS] = competencias
+            registro[STATUS_COMPETENCIAS] = "concluida" if competencias else "vazia"
+        except Exception as exc:
+            registro[STATUS_COMPETENCIAS] = "erro"
+            registro[ERRO_COMPETENCIAS] = f"{type(exc).__name__}: {exc}"
+            raise
+
+    def competencias(self, caminho, registro=None):
+        self.etapa_atual = "validação do dropdown de competências"
+        seletor = self.pagina.find(id=SELETOR_INFORMACOES)
+        if seletor is None or seletor.find("option", value="2") is None or seletor.find("option", value="1") is None:
+            raise RuntimeError("Dropdown de informações não contém as opções esperadas.")
+        if seletor.find("option", selected=True) is None or seletor.find("option", selected=True).get("value") != "1":
+            raise RuntimeError("Painel não estava em Informações Gerais antes de ler competências.")
+        self.etapa_atual = "abertura do painel de competências"
+        self.postback(EVENTO_INFORMACOES, "", {"ctl00$ContentPlaceHolder1$DDLInformacoesGerais": "2"})
+        self._validar_selecao(caminho)
+        seletor = self.pagina.find(id=SELETOR_INFORMACOES)
+        selecionada = seletor.find("option", selected=True) if seletor else None
+        if selecionada is None or selecionada.get("value") != "2":
+            raise RuntimeError("Resposta não confirmou o modo Competências (value=2).")
+        painel = self.pagina.find(id=PAINEL_COMPETENCIAS)
+        if painel is None:
+            raise RuntimeError("Resposta sem painel de competências.")
+        estilo = painel.get("style", "").replace(" ", "").lower()
+        if "display:none" in estilo or "visibility:hidden" in estilo:
+            raise RuntimeError("Painel de competências está oculto na resposta.")
+        elementos_lista = painel.find_all("li")
+        itens = [texto(item) for item in elementos_lista]
+        conteudo = "\n".join(item for item in itens if item)
+        if elementos_lista and not conteudo:
+            raise RuntimeError("Painel de Competências contém item(ns) <li>, mas o texto extraído está vazio.")
+        if not conteudo:
+            conteudo = texto(painel)
+        if registro is not None:
+            registro[CAMPO_COMPETENCIAS] = conteudo
+        self.etapa_atual = "restauração de Informações Gerais"
+        self.postback(EVENTO_INFORMACOES, "", {"ctl00$ContentPlaceHolder1$DDLInformacoesGerais": "1"})
+        self._validar_selecao(caminho)
+        seletor = self.pagina.find(id=SELETOR_INFORMACOES)
+        selecionada = seletor.find("option", selected=True) if seletor else None
+        if selecionada is None or selecionada.get("value") != "1":
+            raise RuntimeError("Não foi possível restaurar Informações Gerais.")
+        return conteudo
+
+    def _validar_selecao(self, caminho):
+        selecionado = self.pagina.find(id=ARVORE + "_SelectedNode")
+        link = self.pagina.find(id=selecionado.get("value", "")) if selecionado else None
+        if link is None or evento(link)[1] != "s" + caminho:
+            raise RuntimeError(f"Unidade selecionada mudou durante a leitura: {caminho}")
 
     def percorrer(self, no, orgao, tipo):
         if self.cancelamento.is_set():
@@ -218,6 +290,8 @@ class ColetorHTTP:
         inicio = time.perf_counter()
         coletor = None
         erro = None
+        etapa = None
+        unidade = None
         try:
             coletor = ColetorHTTP(self.timeout, self.ignoradas, self.cancelamento)
             coletor.requisitar()
@@ -227,6 +301,8 @@ class ColetorHTTP:
             coletor.percorrer(atual, atual.texto, atual.tipo)
         except Exception as exc:
             erro = f"{type(exc).__name__}: {exc}"
+            etapa = coletor.etapa_atual if coletor is not None else "criação da sessão"
+            unidade = coletor.unidade_atual if coletor is not None else None
         finally:
             if coletor is not None:
                 coletor.sessao.close()
@@ -234,15 +310,58 @@ class ColetorHTTP:
         return registros, {
             "orgao": no.texto, "caminho": no.caminho,
             "status": "PARCIAL" if erro else "concluida", "erro": erro,
+            "etapa_erro": etapa, "unidade_erro": unidade,
             "registros": len(registros),
             "requisicoes": coletor.requisicoes if coletor is not None else 0,
             "segundos_http": coletor.segundos_http if coletor is not None else 0.0,
             "segundos_coleta": round(time.perf_counter() - inicio, 3),
         }
 
-    def coletar(self, orgao=None, trabalhadores=4):
+    def _executar_rodada(self, raizes, trabalhadores):
+        executor = ThreadPoolExecutor(max_workers=min(trabalhadores, len(raizes)), thread_name_prefix="sici")
+        tarefas = []
+        interrompido = False
+        try:
+            for no in raizes:
+                tarefas.append(executor.submit(self._coletar_orgao, no))
+            for tarefa in as_completed(tarefas):
+                _, info = tarefa.result()
+                print(f"{info['orgao']}: {info['status']}, {info['registros']} registros "
+                      f"em {info['segundos_coleta']:.1f}s", flush=True)
+        except KeyboardInterrupt:
+            self.cancelamento.set()
+            for tarefa in tarefas:
+                tarefa.cancel()
+            interrompido = True
+        except BaseException:
+            self.cancelamento.set()
+            for tarefa in tarefas:
+                tarefa.cancel()
+            raise
+        finally:
+            executor.shutdown(wait=True, cancel_futures=True)
+        resultados = {}
+        for indice, no in enumerate(raizes):
+            tarefa = tarefas[indice] if indice < len(tarefas) else None
+            if tarefa is None or tarefa.cancelled():
+                registros, info = [], {
+                    "orgao": no.texto, "caminho": no.caminho, "status": "PARCIAL",
+                    "erro": "Tarefa não executada.", "etapa_erro": "agendamento",
+                    "unidade_erro": None, "registros": 0, "requisicoes": 0,
+                    "segundos_http": 0.0, "segundos_coleta": 0.0,
+                }
+            else:
+                registros, info = tarefa.result()
+            resultados[no.caminho] = (registros, info)
+        if interrompido:
+            self.interrompido = True
+        return resultados
+
+    def coletar(self, orgao=None, trabalhadores=4, pausa_recuperacao=5):
         if trabalhadores < 1:
             raise ValueError("O número de trabalhadores deve ser positivo.")
+        if pausa_recuperacao < 0:
+            raise ValueError("A pausa de recuperação não pode ser negativa.")
         self.requisitar()
         raizes = [n for n in self.nos() if n.nivel == 1 and n.tipo in {"A", "D"}]
         if orgao:
@@ -253,41 +372,55 @@ class ColetorHTTP:
         if len({n.caminho for n in raizes}) != len(raizes):
             raise RuntimeError("Órgãos duplicados na árvore inicial.")
         self.trabalhadores_utilizados = min(trabalhadores, len(raizes))
+        self.interrompido = False
         print(f"Coletando {len(raizes)} órgãos com {self.trabalhadores_utilizados} trabalhadores...", flush=True)
-        executor = ThreadPoolExecutor(max_workers=self.trabalhadores_utilizados, thread_name_prefix="sici")
-        tarefas = []
-        try:
-            for no in raizes:
-                tarefas.append(executor.submit(self._coletar_orgao, no))
-            for tarefa in as_completed(tarefas):
-                _, info = tarefa.result()
-                print(f"{info['orgao']}: {info['status']}, {info['registros']} registros "
-                      f"em {info['segundos_coleta']:.1f}s", flush=True)
-        except BaseException:
-            # Ctrl+C cancela a fila; tarefas em curso param antes da próxima requisição.
-            self.cancelamento.set()
-            for tarefa in tarefas:
-                tarefa.cancel()
-            raise
-        finally:
-            executor.shutdown(wait=True, cancel_futures=True)
-            # Agrega apenas após terminar as tarefas, na ordem original da árvore.
-            # Falhas preservam os registros já coletados e não viram sucesso.
-            for indice, no in enumerate(raizes):
-                tarefa = tarefas[indice] if indice < len(tarefas) else None
-                if tarefa is None or tarefa.cancelled():
-                    registros, info = [], {
-                        "orgao": no.texto, "caminho": no.caminho, "status": "cancelada",
-                        "erro": "Tarefa não executada.", "registros": 0,
-                        "requisicoes": 0, "segundos_http": 0.0, "segundos_coleta": 0.0,
-                    }
+        pendentes = list(raizes)
+        finais = {}
+        historico = {no.caminho: [] for no in raizes}
+        trabalhadores_rodada = self.trabalhadores_utilizados
+        numero_rodada = 1
+        while pendentes:
+            trabalhadores_efetivos = min(trabalhadores_rodada, len(pendentes))
+            self.trabalhadores_por_rodada.append(trabalhadores_efetivos)
+            self.trabalhadores_configurados_por_rodada.append(trabalhadores_rodada)
+            print(f"Rodada {numero_rodada}: {len(pendentes)} órgãos pendentes, "
+                  f"{trabalhadores_efetivos} trabalhadores.", flush=True)
+            rodada = self._executar_rodada(pendentes, trabalhadores_rodada)
+            novos_pendentes = []
+            for no in pendentes:
+                registros, info = rodada[no.caminho]
+                historico[no.caminho].append({**info, "rodada": numero_rodada,
+                                              "trabalhadores_configurados": trabalhadores_rodada,
+                                              "trabalhadores": min(trabalhadores_rodada, len(pendentes))})
+                if info["status"] == "concluida":
+                    finais[no.caminho] = (registros, info)
                 else:
-                    registros, info = tarefa.result()
-                self.resultados.extend(registros)
-                self.requisicoes += info["requisicoes"]
-                self.segundos_http += info["segundos_http"]
-                self.orgaos.append(info)
+                    novos_pendentes.append(no)
+                    # Mantém uma tentativa parcial completa, sem misturar dados
+                    # de sessões e estados WebForms distintos.
+                    anterior = finais.get(no.caminho)
+                    if anterior is None or len(registros) > len(anterior[0]):
+                        finais[no.caminho] = (registros, info)
+            pendentes = novos_pendentes
+            if not pendentes or trabalhadores_rodada == 1 or self.interrompido:
+                break
+            trabalhadores_rodada = max(1, trabalhadores_rodada // 2)
+            numero_rodada += 1
+            if pausa_recuperacao:
+                time.sleep(pausa_recuperacao)
+
+        self.resultados = []
+        for no in raizes:
+            registros, info = finais[no.caminho]
+            self.resultados.extend(registros)
+            tentativas = historico[no.caminho]
+            info = {**info, "tentativas": tentativas}
+            self.orgaos.append(info)
+            self.requisicoes += sum(t["requisicoes"] for t in tentativas)
+            self.segundos_http += sum(t["segundos_http"] for t in tentativas)
         falhas = [info["orgao"] for info in self.orgaos if info["status"] != "concluida"]
+        if self.interrompido:
+            raise KeyboardInterrupt()
         if falhas:
             raise RuntimeError("Coleta incompleta nos órgãos: " + ", ".join(falhas))
 
@@ -350,11 +483,15 @@ def main(argv=None):
     parser.add_argument("--saida-dir", type=Path, default=pasta_app / "resultados_http")
     parser.add_argument("--timeout", type=float, default=30, help="Timeout HTTP em segundos (padrão: 30)")
     parser.add_argument("--trabalhadores", type=int, default=4, help="Órgãos simultâneos (padrão: 4; use 1 para execução serial)")
+    parser.add_argument("--pausa-recuperacao", type=float, default=5,
+                        help="Pausa em segundos entre rodadas de recuperação (padrão: 5)")
     args = parser.parse_args(argv)
     if args.timeout <= 0:
         parser.error("--timeout deve ser positivo")
     if args.trabalhadores < 1:
         parser.error("--trabalhadores deve ser positivo")
+    if args.pausa_recuperacao < 0:
+        parser.error("--pausa-recuperacao não pode ser negativa")
     if args.somente_comparar and not args.comparar:
         parser.error("--somente-comparar exige --comparar")
     if args.comparar:
@@ -368,7 +505,7 @@ def main(argv=None):
         inicio = time.perf_counter()
         erro = None
         try:
-            coletor.coletar(args.orgao, args.trabalhadores)
+            coletor.coletar(args.orgao, args.trabalhadores, args.pausa_recuperacao)
             if not coletor.resultados:
                 raise RuntimeError("Coleta sem registros.")
         except (Exception, KeyboardInterrupt) as exc:
@@ -379,7 +516,7 @@ def main(argv=None):
         fim_coleta = datetime.now().astimezone()
         status = "PARCIAL" if erro else "concluida"
         arquivo = args.saida_dir / f"sici_http_{status}_{carimbo}.xlsx"
-        df = pd.DataFrame(coletor.resultados, columns=CAMPOS)
+        df = pd.DataFrame(coletor.resultados, columns=CAMPOS + [CAMPO_COMPETENCIAS, STATUS_COMPETENCIAS, ERRO_COMPETENCIAS])
         df["data_extracao"] = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
         df.to_excel(arquivo, index=False)
         metricas = {
@@ -390,6 +527,9 @@ def main(argv=None):
             "inicio_coleta": inicio_coleta.isoformat(), "fim_coleta": fim_coleta.isoformat(),
             "trabalhadores_solicitados": args.trabalhadores,
             "trabalhadores_utilizados": coletor.trabalhadores_utilizados,
+            "trabalhadores_por_rodada": coletor.trabalhadores_por_rodada,
+            "trabalhadores_configurados_por_rodada": coletor.trabalhadores_configurados_por_rodada,
+            "pausa_recuperacao_segundos": args.pausa_recuperacao,
             "nota_tempos": "segundos_coleta é tempo decorrido, sem exportação/comparação; segundos_http é a soma das requisições concorrentes, incluindo descoberta.",
             "orgaos": coletor.orgaos,
             "palavras_ignoradas": coletor.ignoradas,
