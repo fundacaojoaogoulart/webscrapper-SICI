@@ -29,6 +29,7 @@ import re
 import sys
 from threading import Event
 import time
+import unicodedata
 
 from bs4 import BeautifulSoup
 import pandas as pd
@@ -49,6 +50,16 @@ SELETOR_INFORMACOES = PREFIXO + "DDLInformacoesGerais"
 EVENTO_INFORMACOES = "ctl00$ContentPlaceHolder1$DDLInformacoesGerais"
 PAINEL_COMPETENCIAS = PREFIXO + "PanelCompetenciaInterno"
 EVENTO = re.compile(r"__doPostBack\('([^']*)','([^']*)'\)")
+ORGAOS_INDIRETA = (
+    "CCPAR", "CET-RIO", "CMTC RIO", "COMLURB", "GEO-RIO", "IPLANRIO",
+    "RIO-ÁGUAS", "RIOFILME", "RIOLUZ", "RIOSAÚDE", "RIOTUR", "RIO-URBE",
+)
+
+
+def normalizar_nome_orgao(valor):
+    valor = unicodedata.normalize("NFKD", valor)
+    valor = "".join(c for c in valor if not unicodedata.combining(c))
+    return " ".join(valor.casefold().replace("-", " ").split())
 
 
 @dataclass(frozen=True)
@@ -171,6 +182,10 @@ class ColetorHTTP:
                     tipo = "A"
                 elif src.endswith("-D.gif"):
                     tipo = "D"
+                elif src.endswith("-E.gif"):
+                    tipo = "E"
+                elif src.endswith("-F.gif"):
+                    tipo = "F"
                 if imagem.get("alt", "").startswith("Expand"):
                     expandir = evento(imagem.find_parent("a"))
             nos.append(No(caminho, texto(link), nivel, tipo, expandir))
@@ -285,7 +300,36 @@ class ColetorHTTP:
                 raise RuntimeError(f"Hierarquia inesperada: {filho.caminho}")
             self.percorrer(filho, orgao, tipo)
 
-    def _coletar_orgao(self, no):
+    def percorrer_indireta(self, orgao_no):
+        """Coleta somente o ramo da Presidência como escalões 1º a 3º."""
+        if self.cancelamento.is_set():
+            raise RuntimeError("Coleta cancelada.")
+        filhos_orgao = self.expandir(orgao_no.caminho)
+        presidencias = [filho for filho in filhos_orgao
+                        if filho.texto.strip().casefold() == "presidência"]
+        if len(presidencias) != 1:
+            raise RuntimeError(
+                f"Esperada uma Presidência em {orgao_no.texto}; encontradas {len(presidencias)}."
+            )
+
+        def percorrer_ramo(no, escalao):
+            if self.cancelamento.is_set():
+                raise RuntimeError("Coleta cancelada.")
+            if no.caminho in self.visitados:
+                raise RuntimeError(f"Nó visitado mais de uma vez: {no.caminho}")
+            self.visitados.add(no.caminho)
+            if not no.texto or any(p in no.texto.lower() for p in self.ignoradas):
+                return
+            filhos = self.expandir(no.caminho) if escalao < 3 else []
+            self.capturar(no, orgao_no.texto, f"{escalao}º")
+            for filho in filhos:
+                if filho.nivel != no.nivel + 1:
+                    raise RuntimeError(f"Hierarquia inesperada: {filho.caminho}")
+                percorrer_ramo(filho, escalao + 1)
+
+        percorrer_ramo(presidencias[0], 1)
+
+    def _coletar_orgao(self, no, administracao="direta"):
         """Uma tarefa possui sessão, cookies, VIEWSTATE e resultados próprios."""
         inicio = time.perf_counter()
         coletor = None
@@ -294,11 +338,15 @@ class ColetorHTTP:
         unidade = None
         try:
             coletor = ColetorHTTP(self.timeout, self.ignoradas, self.cancelamento)
+            coletor.administracao = administracao
             coletor.requisitar()
             atual = coletor.localizar(no.caminho)
             if (atual.texto, atual.nivel, atual.tipo) != (no.texto, no.nivel, no.tipo):
                 raise RuntimeError("O órgão mudou entre a descoberta e a coleta.")
-            coletor.percorrer(atual, atual.texto, atual.tipo)
+            if self.administracao == "indireta":
+                coletor.percorrer_indireta(atual)
+            else:
+                coletor.percorrer(atual, atual.texto, atual.tipo)
         except Exception as exc:
             erro = f"{type(exc).__name__}: {exc}"
             etapa = coletor.etapa_atual if coletor is not None else "criação da sessão"
@@ -317,13 +365,13 @@ class ColetorHTTP:
             "segundos_coleta": round(time.perf_counter() - inicio, 3),
         }
 
-    def _executar_rodada(self, raizes, trabalhadores):
+    def _executar_rodada(self, raizes, trabalhadores, administracao="direta"):
         executor = ThreadPoolExecutor(max_workers=min(trabalhadores, len(raizes)), thread_name_prefix="sici")
         tarefas = []
         interrompido = False
         try:
             for no in raizes:
-                tarefas.append(executor.submit(self._coletar_orgao, no))
+                tarefas.append(executor.submit(self._coletar_orgao, no, administracao))
             for tarefa in as_completed(tarefas):
                 _, info = tarefa.result()
                 print(f"{info['orgao']}: {info['status']}, {info['registros']} registros "
@@ -357,18 +405,38 @@ class ColetorHTTP:
             self.interrompido = True
         return resultados
 
-    def coletar(self, orgao=None, trabalhadores=4, pausa_recuperacao=5):
+    def coletar(self, orgao=None, trabalhadores=4, pausa_recuperacao=5, administracao="direta"):
         if trabalhadores < 1:
             raise ValueError("O número de trabalhadores deve ser positivo.")
         if pausa_recuperacao < 0:
             raise ValueError("A pausa de recuperação não pode ser negativa.")
+        if administracao not in {"direta", "indireta", "ambas"}:
+            raise ValueError("Administração deve ser direta, indireta ou ambas.")
+        self.administracao = administracao
         self.requisitar()
-        raizes = [n for n in self.nos() if n.nivel == 1 and n.tipo in {"A", "D"}]
+        todos_nos = [n for n in self.nos() if n.nivel == 1]
+        diretos = [n for n in todos_nos if n.tipo in {"A", "D"}]
+        nomes_indireta = {normalizar_nome_orgao(nome) for nome in ORGAOS_INDIRETA}
+        indiretos = [n for n in todos_nos if normalizar_nome_orgao(n.texto) in nomes_indireta]
+        if administracao == "direta":
+            raizes = diretos
+        elif administracao == "indireta":
+            raizes = indiretos
+        else:
+            raizes = diretos + indiretos
         if orgao:
-            raizes = [n for n in raizes if n.texto.casefold() == orgao.casefold()]
+            raizes = [n for n in raizes
+                      if normalizar_nome_orgao(n.texto) == normalizar_nome_orgao(orgao)]
         raizes = [n for n in raizes if n.texto and not any(p in n.texto.lower() for p in self.ignoradas)]
         if not raizes:
-            raise RuntimeError("Nenhum órgão A/D encontrado para o escopo solicitado.")
+            raise RuntimeError("Nenhum órgão encontrado para o escopo solicitado.")
+        if administracao in {"indireta", "ambas"}:
+            encontrados = {normalizar_nome_orgao(n.texto) for n in indiretos}
+            faltantes = sorted(n for n in nomes_indireta if n not in encontrados)
+            if orgao:
+                faltantes = [n for n in faltantes if n == normalizar_nome_orgao(orgao)]
+            if faltantes:
+                raise RuntimeError("Órgãos da administração indireta ausentes na árvore: " + ", ".join(faltantes))
         if len({n.caminho for n in raizes}) != len(raizes):
             raise RuntimeError("Órgãos duplicados na árvore inicial.")
         self.trabalhadores_utilizados = min(trabalhadores, len(raizes))
@@ -385,7 +453,7 @@ class ColetorHTTP:
             self.trabalhadores_configurados_por_rodada.append(trabalhadores_rodada)
             print(f"Rodada {numero_rodada}: {len(pendentes)} órgãos pendentes, "
                   f"{trabalhadores_efetivos} trabalhadores.", flush=True)
-            rodada = self._executar_rodada(pendentes, trabalhadores_rodada)
+            rodada = self._executar_rodada(pendentes, trabalhadores_rodada, administracao)
             novos_pendentes = []
             for no in pendentes:
                 registros, info = rodada[no.caminho]
@@ -477,6 +545,8 @@ def comparar(arquivo_http, referencia, destino, orgao=None):
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--orgao", help="Nome exato do órgão, por exemplo GBP ou CASA CIVIL")
+    parser.add_argument("--administracao", choices=("direta", "indireta", "ambas"), default="direta",
+                        help="Escopo da coleta (padrão: direta)")
     parser.add_argument("--comparar", type=Path, help="Excel original gerado pelo Selenium")
     parser.add_argument("--somente-comparar", type=Path, help="Excel HTTP existente; não acessa o portal")
     pasta_app = Path(sys.executable if getattr(sys, "frozen", False) else __file__).resolve().parent
@@ -505,7 +575,7 @@ def main(argv=None):
         inicio = time.perf_counter()
         erro = None
         try:
-            coletor.coletar(args.orgao, args.trabalhadores, args.pausa_recuperacao)
+            coletor.coletar(args.orgao, args.trabalhadores, args.pausa_recuperacao, args.administracao)
             if not coletor.resultados:
                 raise RuntimeError("Coleta sem registros.")
         except (Exception, KeyboardInterrupt) as exc:
@@ -515,12 +585,13 @@ def main(argv=None):
         duracao = time.perf_counter() - inicio
         fim_coleta = datetime.now().astimezone()
         status = "PARCIAL" if erro else "concluida"
-        arquivo = args.saida_dir / f"sici_http_{status}_{carimbo}.xlsx"
+        arquivo = args.saida_dir / f"sici_http_{args.administracao}_{status}_{carimbo}.xlsx"
         df = pd.DataFrame(coletor.resultados, columns=CAMPOS + [CAMPO_COMPETENCIAS, STATUS_COMPETENCIAS, ERRO_COMPETENCIAS])
         df["data_extracao"] = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
         df.to_excel(arquivo, index=False)
         metricas = {
             "status": status, "erro": erro, "orgao": args.orgao,
+            "administracao": args.administracao,
             "registros": len(df), "requisicoes": coletor.requisicoes,
             "segundos_coleta": round(duracao, 3),
             "segundos_http": round(coletor.segundos_http, 3),

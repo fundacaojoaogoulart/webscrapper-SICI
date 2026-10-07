@@ -168,7 +168,7 @@ class ParalelismoTest(unittest.TestCase):
             codigo = main(["--saida-dir", pasta, "--pausa-recuperacao", "0", "--comparar", str(referencia)])
             self.assertEqual(codigo, 1)
             comparar.assert_not_called()
-            arquivo = next(Path(pasta).glob("sici_http_PARCIAL_*.xlsx"))
+            arquivo = next(Path(pasta).glob("sici_http_direta_PARCIAL_*.xlsx"))
             dados = pd.read_excel(arquivo)
             self.assertEqual(len(dados), 5)
             self.assertIn("competências", dados.columns)

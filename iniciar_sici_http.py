@@ -33,24 +33,28 @@ def iniciar():
     codigo = 0
     try:
         print("SICI HTTP - EXTRACAO PARALELA (4 trabalhadores)\n")
-        print("1 - Extracao completa por HTTP")
-        print("2 - Extracao completa e comparacao com Excel do Selenium")
-        print("3 - Comparar dois arquivos ja extraidos")
+        print("1 - Extrair órgãos da administração direta")
+        print("2 - Extrair órgãos da administração indireta")
+        print("3 - Extrair os dois grupos")
+        print("4 - Extrair administração direta e comparar com Excel do Selenium")
+        print("5 - Comparar dois arquivos já extraídos")
         print("0 - Sair\n")
         opcao = input("Escolha uma opcao: ").strip()
         if opcao == "0":
             return 0
-        if opcao not in {"1", "2", "3"}:
+        if opcao not in {"1", "2", "3", "4", "5"}:
             print("Opcao invalida.")
             return 1
         argumentos = []
         if opcao in {"2", "3"}:
+            argumentos.extend(["--administracao", "indireta" if opcao == "2" else "ambas"])
+        if opcao in {"4", "5"}:
             referencia = selecionar_planilha("Selecione a extracao ORIGINAL do Selenium")
             if not referencia:
                 print("Operacao cancelada.")
                 return 0
             argumentos.extend(["--comparar", referencia])
-        if opcao == "3":
+        if opcao == "5":
             http = selecionar_planilha("Selecione a extracao HTTP para comparar")
             if not http:
                 print("Operacao cancelada.")

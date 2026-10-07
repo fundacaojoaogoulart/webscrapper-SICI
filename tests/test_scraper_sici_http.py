@@ -90,6 +90,30 @@ class NavegacaoTest(unittest.TestCase):
             self.assertEqual([c.args[0].nivel for c in capturar.call_args_list], niveis)
             self.assertEqual([c.args[2] for c in capturar.call_args_list], ["1º", "2º", "3º"])
 
+    def test_indireta_comeca_na_presidencia_e_para_no_terceiro_escalao(self):
+        orgao = No("1\\42", "CCPAR", 1, "E", None)
+        paralelo = No("1\\42\\10", "Conselho Fiscal", 2, "", None)
+        presidencia = No("1\\42\\11", "Presidência", 2, "", None)
+        unidade = No("1\\42\\11\\12", "Diretoria", 3, "", None)
+        subordinada = No("1\\42\\11\\12\\13", "Gerência", 4, "", None)
+        filhos = {
+            orgao.caminho: [paralelo, presidencia],
+            presidencia.caminho: [unidade],
+            unidade.caminho: [subordinada],
+        }
+        with patch.object(self.coletor, "expandir", side_effect=lambda caminho: filhos[caminho]), \
+                patch.object(self.coletor, "capturar") as capturar:
+            self.coletor.percorrer_indireta(orgao)
+        self.assertEqual([(c.args[0].texto, c.args[2]) for c in capturar.call_args_list], [
+            ("Presidência", "1º"), ("Diretoria", "2º"), ("Gerência", "3º")])
+        self.assertNotIn(paralelo.caminho, self.coletor.visitados)
+        self.assertNotIn(subordinada.caminho, self.coletor.visitados)
+
+    def test_normalizacao_dos_nomes_da_lista_indireta(self):
+        from scraper_sici_http import normalizar_nome_orgao
+        self.assertEqual(normalizar_nome_orgao("RIO-ÁGUAS"), normalizar_nome_orgao("Rio Águas"))
+        self.assertEqual(normalizar_nome_orgao("CMTC RIO"), normalizar_nome_orgao("CMTC Rio"))
+
     def test_escape_do_caminho_webforms(self):
         link = BeautifulSoup(r'''<a href="javascript:__doPostBack('arvore','s1\\4100')">GBP</a>''', "html.parser").a
         self.assertEqual(evento(link), ("arvore", "s1\\4100"))
@@ -105,6 +129,16 @@ class NavegacaoTest(unittest.TestCase):
             </td></tr></table></div>''', "html.parser")
         nos = self.coletor.nos()
         self.assertEqual(nos, [No("1\\42", "ORG", 1, "D", ("arvore", "t1\\42"))])
+
+    def test_nos_identificam_tipos_de_orgao_da_indireta(self):
+        for tipo in ("E", "F"):
+            self.coletor.pagina = BeautifulSoup(f'''<div id="{ARVORE}"><table><tr>
+                <td><div style="width:20px;height:1px"></div></td>
+                <td><a href="javascript:__doPostBack('arvore','t1\\\\42')"><img alt="Expand ORG"></a></td>
+                <td><img src="folder-{tipo}.gif"></td><td>
+                <a id="{ARVORE}t1" href="javascript:__doPostBack('arvore','s1\\\\42')">ORG</a>
+                </td></tr></table></div>''', "html.parser")
+            self.assertEqual(self.coletor.nos()[0].tipo, tipo)
 
 
 if __name__ == "__main__":
