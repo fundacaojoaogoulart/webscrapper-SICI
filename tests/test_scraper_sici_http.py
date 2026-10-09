@@ -6,7 +6,7 @@ from unittest.mock import patch
 from bs4 import BeautifulSoup
 import pandas as pd
 
-from scraper_sici_http import ARVORE, CAMPOS, ColetorHTTP, No, comparar, evento, main
+from scraper_sici_http import ARVORE, CAMPOS, ColetorHTTP, No, comparar, evento, ler_extracao, main
 
 
 class ComparacaoTest(unittest.TestCase):
@@ -50,6 +50,110 @@ class ComparacaoTest(unittest.TestCase):
             df.iloc[:1].to_excel(http, index=False)
             self.assertFalse(comparar(http, ref, rel))
             self.assertTrue(comparar(http, ref, rel, "gbp"))
+
+
+class EscoposTest(unittest.TestCase):
+    def setUp(self):
+        self.direto = No("1\\1", "GBP", 1, "D", None)
+        self.indireto = No("1\\42", "CCPAR", 1, "E", None)
+        self.conselho = No("1\\42\\10", "Conselho Fiscal", 2, "", None)
+        self.presidencia = No("1\\42\\11", "Presidência", 2, "", None)
+        self.diretoria = No("1\\42\\11\\12", "Diretoria", 3, "", None)
+        self.gerencia = No("1\\42\\11\\12\\13", "Gerência", 4, "", None)
+        self.filhos = {
+            self.direto.caminho: [],
+            self.indireto.caminho: [self.conselho, self.presidencia],
+            self.conselho.caminho: [],
+            self.presidencia.caminho: [self.diretoria],
+            self.diretoria.caminho: [self.gerencia],
+        }
+        for alvo, kwargs in [
+            ("ORGAOS_INDIRETA", {"new": ("CCPAR",)}),
+            ("config_manager.ler_config", {"return_value": {"PALAVRAS_IGNORADAS": []}}),
+            ("ColetorHTTP.requisitar", {}),
+            ("ColetorHTTP.nos", {"side_effect": lambda: [self.direto, self.indireto]}),
+            ("ColetorHTTP.expandir", {"side_effect": lambda c: self.filhos[c]}),
+            ("ColetorHTTP.capturar", {"new": self.captura_simulada()}),
+        ]:
+            contexto = patch("scraper_sici_http." + alvo, **kwargs)
+            contexto.start()
+            self.addCleanup(contexto.stop)
+
+    @staticmethod
+    def captura_simulada():
+        def capturar(coletor, no, orgao, escalao):
+            coletor.resultados.append(dict(zip(CAMPOS, [orgao, escalao, no.texto, "Cargo", "Titular"])))
+        return capturar
+
+    def coletar(self, modo, trabalhadores=4):
+        coletor = ColetorHTTP(ignoradas=[])
+        self.addCleanup(coletor.sessao.close)
+        coletor.coletar(administracao=modo, trabalhadores=trabalhadores, pausa_recuperacao=0)
+        return coletor
+
+    def test_indiretas_equivalentes_em_ambas_serial_paralelo_e_recuperacao(self):
+        esperado = self.coletar("indireta").resultados
+        self.assertEqual([(r["área"], r["escalão"]) for r in esperado], [
+            ("Presidência", "1º"), ("Diretoria", "2º"), ("Gerência", "3º")])
+        for trabalhadores in (1, 4):
+            with self.subTest(trabalhadores=trabalhadores):
+                ambos = self.coletar("ambas", trabalhadores)
+                self.assertEqual([r for r in ambos.resultados if r["órgão"] == "CCPAR"], esperado)
+                self.assertEqual(ambos.resultados[0]["órgão"], "GBP")
+
+        original = ColetorHTTP.percorrer_indireta
+        tentativas = []
+
+        def falhar_uma_vez(coletor, no):
+            tentativas.append(no.caminho)
+            if len(tentativas) == 1:
+                raise RuntimeError("Falha simulada")
+            return original(coletor, no)
+
+        with patch.object(ColetorHTTP, "percorrer_indireta", falhar_uma_vez):
+            recuperado = self.coletar("ambas")
+        self.assertEqual(len(tentativas), 2)
+        self.assertEqual([r for r in recuperado.resultados if r["órgão"] == "CCPAR"], esperado)
+
+    def test_indireto_com_icone_A_nao_duplica_nem_entra_em_direta(self):
+        self.indireto = No(self.indireto.caminho, "CCPAR", 1, "A", None)
+        self.assertEqual([r["órgão"] for r in self.coletar("direta").resultados], ["GBP"])
+        self.assertEqual(len(self.coletar("ambas").resultados), 4)
+
+    def test_exportacao_e_leitura_de_duas_abas_inclusive_parcial(self):
+        for parcial in (False, True):
+            with self.subTest(parcial=parcial), tempfile.TemporaryDirectory() as pasta:
+                original = ColetorHTTP.percorrer_indireta
+
+                def percorrer(coletor, no):
+                    original(coletor, no)
+                    if parcial:
+                        raise RuntimeError("Falha após capturar")
+
+                with patch.object(ColetorHTTP, "percorrer_indireta", percorrer):
+                    codigo = main(["--administracao", "ambas", "--saida-dir", pasta, "--pausa-recuperacao", "0"])
+                self.assertEqual(codigo, 1 if parcial else 0)
+                arquivo = next(Path(pasta).glob("sici_http_*.xlsx"))
+                abas = pd.read_excel(arquivo, sheet_name=None)
+                self.assertEqual(list(abas), ["Direta", "Indireta"])
+                self.assertEqual(abas["Direta"]["órgão"].tolist(), ["GBP"])
+                self.assertEqual(abas["Indireta"]["órgão"].tolist(), ["CCPAR"] * 3)
+                self.assertEqual(abas["Indireta"]["escalão"].tolist(), ["1º", "2º", "3º"])
+                self.assertEqual(len(ler_extracao(arquivo)), 4)
+                self.assertEqual(len(ler_extracao(arquivo, "CCPAR")), 3)
+                referencia = Path(pasta) / "referencia.xlsx"
+                pd.concat(abas.values()).to_excel(referencia, index=False)
+                self.assertTrue(comparar(arquivo, referencia, Path(pasta) / "comparacao.xlsx"))
+
+    def test_exportacao_ambas_com_aba_vazia_preserva_cabecalhos(self):
+        with tempfile.TemporaryDirectory() as pasta:
+            codigo = main(["--administracao", "ambas", "--orgao", "CCPAR", "--saida-dir", pasta])
+            self.assertEqual(codigo, 0)
+            arquivo = next(Path(pasta).glob("sici_http_*.xlsx"))
+            abas = pd.read_excel(arquivo, sheet_name=None)
+            self.assertTrue(abas["Direta"].empty)
+            self.assertEqual(list(abas["Direta"].columns), list(abas["Indireta"].columns))
+            self.assertEqual(len(ler_extracao(arquivo)), 3)
 
 
 class NavegacaoTest(unittest.TestCase):
@@ -96,10 +200,12 @@ class NavegacaoTest(unittest.TestCase):
         presidencia = No("1\\42\\11", "Presidência", 2, "", None)
         unidade = No("1\\42\\11\\12", "Diretoria", 3, "", None)
         subordinada = No("1\\42\\11\\12\\13", "Gerência", 4, "", None)
+        quarto_escalao = No("1\\42\\11\\12\\13\\14", "Serviço", 5, "", None)
         filhos = {
             orgao.caminho: [paralelo, presidencia],
             presidencia.caminho: [unidade],
             unidade.caminho: [subordinada],
+            subordinada.caminho: [quarto_escalao],
         }
         with patch.object(self.coletor, "expandir", side_effect=lambda caminho: filhos[caminho]), \
                 patch.object(self.coletor, "capturar") as capturar:
@@ -107,7 +213,8 @@ class NavegacaoTest(unittest.TestCase):
         self.assertEqual([(c.args[0].texto, c.args[2]) for c in capturar.call_args_list], [
             ("Presidência", "1º"), ("Diretoria", "2º"), ("Gerência", "3º")])
         self.assertNotIn(paralelo.caminho, self.coletor.visitados)
-        self.assertNotIn(subordinada.caminho, self.coletor.visitados)
+        self.assertIn(subordinada.caminho, self.coletor.visitados)
+        self.assertNotIn(quarto_escalao.caminho, self.coletor.visitados)
 
     def test_normalizacao_dos_nomes_da_lista_indireta(self):
         from scraper_sici_http import normalizar_nome_orgao

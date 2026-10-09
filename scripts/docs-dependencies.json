@@ -14,6 +14,12 @@
       "reason": "Fontes, extração, regras de classificação, transformações e planilhas do fluxo SICI/MFE."
     },
     {
+      "globs": ["scraper_sici_http.py", "iniciar_sici_http.py"],
+      "documents": ["docs/data-lineage.md", "docs/architecture.md"],
+      "decision": "review_ai",
+      "reason": "Coleta HTTP alternativa, escopos direta/indireta/ambas, regra da Presidência nas indiretas, abas Direta/Indireta e comparação com o Excel do Selenium."
+    },
+    {
       "globs": ["match_lideres.py", "gestores_equipes.py"],
       "documents": ["docs/data-lineage.md", "docs/architecture.md"],
       "decision": "review_ai",

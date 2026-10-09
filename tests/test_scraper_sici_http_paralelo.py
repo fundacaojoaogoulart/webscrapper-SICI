@@ -203,6 +203,15 @@ class ParalelismoTest(unittest.TestCase):
         self.assertEqual(len(orgao["tentativas"]), 2)
         self.assertEqual([t["trabalhadores_configurados"] for t in orgao["tentativas"]], [4, 2])
 
+    def test_serial_retenta_orgao_parcial(self):
+        portal = PortalSimulado(falhar=2, falhar_uma_vez=True)
+        coletor = self.coletar(portal, 1)
+        self.assertEqual(len(coletor.resultados), 6)
+        orgao = coletor.orgaos[2]
+        self.assertEqual(orgao["status"], "concluida")
+        self.assertEqual(len(orgao["tentativas"]), 2)
+        self.assertEqual([t["trabalhadores_configurados"] for t in orgao["tentativas"]], [1, 1])
+
     def test_conteudo_competencias_preservado_se_falha_so_ao_restaurar_dropdown(self):
         portal = PortalSimulado(falhar_restauracao=True)
         with patch("scraper_sici_http.requests.Session", side_effect=portal.sessao):

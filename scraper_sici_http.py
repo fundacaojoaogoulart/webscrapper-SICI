@@ -62,6 +62,10 @@ def normalizar_nome_orgao(valor):
     return " ".join(valor.casefold().replace("-", " ").split())
 
 
+def orgao_indireto(nome):
+    return normalizar_nome_orgao(nome) in {normalizar_nome_orgao(n) for n in ORGAOS_INDIRETA}
+
+
 @dataclass(frozen=True)
 class No:
     caminho: str
@@ -343,7 +347,7 @@ class ColetorHTTP:
             atual = coletor.localizar(no.caminho)
             if (atual.texto, atual.nivel, atual.tipo) != (no.texto, no.nivel, no.tipo):
                 raise RuntimeError("O órgão mudou entre a descoberta e a coleta.")
-            if self.administracao == "indireta":
+            if orgao_indireto(atual.texto):
                 coletor.percorrer_indireta(atual)
             else:
                 coletor.percorrer(atual, atual.texto, atual.tipo)
@@ -415,9 +419,9 @@ class ColetorHTTP:
         self.administracao = administracao
         self.requisitar()
         todos_nos = [n for n in self.nos() if n.nivel == 1]
-        diretos = [n for n in todos_nos if n.tipo in {"A", "D"}]
+        diretos = [n for n in todos_nos if n.tipo in {"A", "D"} and not orgao_indireto(n.texto)]
         nomes_indireta = {normalizar_nome_orgao(nome) for nome in ORGAOS_INDIRETA}
-        indiretos = [n for n in todos_nos if normalizar_nome_orgao(n.texto) in nomes_indireta]
+        indiretos = [n for n in todos_nos if orgao_indireto(n.texto)]
         if administracao == "direta":
             raizes = diretos
         elif administracao == "indireta":
@@ -447,6 +451,11 @@ class ColetorHTTP:
         historico = {no.caminho: [] for no in raizes}
         trabalhadores_rodada = self.trabalhadores_utilizados
         numero_rodada = 1
+        # A redução pela metade dos trabalhadores fornece bit_length(N) rodadas
+        # (N, N//2, ..., 1). Com um único trabalhador isso daria uma rodada só,
+        # sem retry; garantimos ao menos duas rodadas para que as parciais sejam
+        # tentadas novamente também na execução serial.
+        max_rodadas = max(2, self.trabalhadores_utilizados.bit_length())
         while pendentes:
             trabalhadores_efetivos = min(trabalhadores_rodada, len(pendentes))
             self.trabalhadores_por_rodada.append(trabalhadores_efetivos)
@@ -470,7 +479,7 @@ class ColetorHTTP:
                     if anterior is None or len(registros) > len(anterior[0]):
                         finais[no.caminho] = (registros, info)
             pendentes = novos_pendentes
-            if not pendentes or trabalhadores_rodada == 1 or self.interrompido:
+            if not pendentes or self.interrompido or numero_rodada >= max_rodadas:
                 break
             trabalhadores_rodada = max(1, trabalhadores_rodada // 2)
             numero_rodada += 1
@@ -494,10 +503,16 @@ class ColetorHTTP:
 
 
 def ler_extracao(caminho, orgao=None):
-    df = pd.read_excel(caminho, dtype=str, keep_default_na=False)
-    ausentes = set(CAMPOS) - set(df.columns)
-    if ausentes:
-        raise ValueError(f"{caminho}: colunas ausentes: {sorted(ausentes)}")
+    with pd.ExcelFile(caminho) as arquivo:
+        abas = ["Direta", "Indireta"] if {"Direta", "Indireta"}.issubset(arquivo.sheet_names) else [arquivo.sheet_names[0]]
+        quadros = []
+        for aba in abas:
+            df = pd.read_excel(arquivo, sheet_name=aba, dtype=str, keep_default_na=False)
+            ausentes = set(CAMPOS) - set(df.columns)
+            if ausentes:
+                raise ValueError(f"{caminho} ({aba}): colunas ausentes: {sorted(ausentes)}")
+            quadros.append(df)
+    df = pd.concat(quadros, ignore_index=True)
     if orgao:
         df = df[df["órgão"].str.casefold() == orgao.casefold()]
     if df.empty:
@@ -588,7 +603,13 @@ def main(argv=None):
         arquivo = args.saida_dir / f"sici_http_{args.administracao}_{status}_{carimbo}.xlsx"
         df = pd.DataFrame(coletor.resultados, columns=CAMPOS + [CAMPO_COMPETENCIAS, STATUS_COMPETENCIAS, ERRO_COMPETENCIAS])
         df["data_extracao"] = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
-        df.to_excel(arquivo, index=False)
+        if args.administracao == "ambas":
+            indiretos = df["órgão"].map(orgao_indireto).astype(bool)
+            with pd.ExcelWriter(arquivo, engine="openpyxl") as writer:
+                df.loc[~indiretos].to_excel(writer, sheet_name="Direta", index=False)
+                df.loc[indiretos].to_excel(writer, sheet_name="Indireta", index=False)
+        else:
+            df.to_excel(arquivo, index=False)
         metricas = {
             "status": status, "erro": erro, "orgao": args.orgao,
             "administracao": args.administracao,
